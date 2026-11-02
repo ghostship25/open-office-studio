@@ -56,6 +56,25 @@ const tekstToegankelijk = {
 };
 
 const rekenbladToegankelijk = {
+  // Nieuwe teksten van de rekenkern 0.5.1 (aanvulling op rekenbladNl).
+  toolbar: { groups: { file: "Bestand" } },
+  editor: {
+    openErrorDescription:
+      "De werkmap kon niet worden geopend. Het bestand is mogelijk beschadigd of heeft een niet-ondersteund formaat.",
+    stoppedError: "De editorsessie is gestopt",
+    stoppedErrorDescription:
+      "De sessie kan geen wijzigingen meer aannemen. Herlaad de pagina om de werkmap opnieuw te openen.",
+    loadError: "De werkmap kon niet worden geladen",
+    loadErrorDescription: "De rekenkern kon niet worden gestart.",
+    reloadPage: "Pagina herladen",
+    showDetails: "Details tonen",
+    openPrompt: "Een XLSX-bestand openen",
+  },
+  presence: {
+    label: "Deelnemers",
+    unavailableSheet: "Op een niet-beschikbaar blad",
+    peerOnSheet: "{name} is op {sheet}",
+  },
   a11y: {
     gridLabel: "Rekenbladraster",
     rowHeaderLabel: "Rij {row}",
