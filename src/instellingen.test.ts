@@ -18,6 +18,13 @@ describe("instellingen", () => {
     expect(raar.statusbalk.zoom).toBe(false);
     expect(raar.statusbalk.tekst).toBe(true);
     expect(raar.emailExterneInhoud).toBe("account");
+    expect(raar.recent.aantal).toBe(25);
+  });
+
+  it("normaliseert de limiet voor recente bestanden", () => {
+    expect(normaliseerInstellingen({ recent: { aantal: 0 } }).recent.aantal).toBe(1);
+    expect(normaliseerInstellingen({ recent: { aantal: 200 } }).recent.aantal).toBe(100);
+    expect(normaliseerInstellingen({ recent: { aantal: 12.6 } }).recent.aantal).toBe(13);
   });
 
   it("voegt geneste wijzigingen samen", () => {

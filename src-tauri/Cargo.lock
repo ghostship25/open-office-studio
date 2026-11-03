@@ -3159,6 +3159,7 @@ dependencies = [
  "tokio-rustls",
  "uuid",
  "webpki-roots",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

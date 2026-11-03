@@ -41,9 +41,17 @@ const GEBEURTENIS: &str = "office-systeembestanden";
 pub const ACTIVEER: &str = "office-activeer-werkbestand";
 const MAX_GROOTTE: u64 = 100 * 1024 * 1024;
 
+#[derive(Debug, PartialEq)]
 struct Wachtend {
     pad: PathBuf,
     venster: String,
+    neerzetpunt: Option<Neerzetpunt>,
+}
+
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq)]
+pub struct Neerzetpunt {
+    x: f64,
+    y: f64,
 }
 
 #[derive(Default)]
@@ -57,6 +65,7 @@ pub struct Systeembestanden {
 pub struct Aangeboden {
     id: u64,
     naam: String,
+    neerzetpunt: Option<Neerzetpunt>,
 }
 
 impl Systeembestanden {
@@ -70,6 +79,15 @@ impl Systeembestanden {
     }
 
     pub(crate) fn voeg_toe(&self, paden: Vec<PathBuf>, venster: &str) -> usize {
+        self.voeg_toe_met_punt(paden, venster, None)
+    }
+
+    fn voeg_toe_met_punt(
+        &self,
+        paden: Vec<PathBuf>,
+        venster: &str,
+        neerzetpunt: Option<Neerzetpunt>,
+    ) -> usize {
         let Ok(mut wachtrij) = self.wachtrij.lock() else {
             return 0;
         };
@@ -81,6 +99,7 @@ impl Systeembestanden {
                 Wachtend {
                     pad,
                     venster: venster.to_owned(),
+                    neerzetpunt,
                 },
             );
         }
@@ -101,16 +120,17 @@ impl Systeembestanden {
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default(),
+                neerzetpunt: w.neerzetpunt,
             })
             .collect()
     }
 
-    fn neem(&self, id: u64, venster: &str) -> Option<PathBuf> {
+    fn neem(&self, id: u64, venster: &str) -> Option<Wachtend> {
         let mut wachtrij = self.wachtrij.lock().ok()?;
         if wachtrij.get(&id)?.venster != venster {
             return None;
         }
-        wachtrij.remove(&id).map(|w| w.pad)
+        wachtrij.remove(&id)
     }
 
     /// Verplaatst wachtende bestanden van een gesloten venster; waar als er iets verhuisde.
@@ -232,9 +252,18 @@ pub fn bij_venstergebeurtenis<R: tauri::Runtime>(
         }
         // Bestanden die op het venster worden gesleept: zelfde route als een
         // dubbelklik, maar naar dit venster. Mappen en dergelijke vallen af.
-        tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+        tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, position }) => {
             let paden = paths.iter().filter(|p| p.is_file()).cloned().collect();
-            ontvang_in(venster.app_handle(), venster.label(), paden);
+            let schaal = venster.scale_factor().unwrap_or(1.0);
+            let positie = Some(Neerzetpunt {
+                x: position.x / schaal,
+                y: position.y / schaal,
+            });
+            let app = venster.app_handle();
+            let staat = app.state::<Systeembestanden>();
+            if staat.voeg_toe_met_punt(paden, venster.label(), positie) > 0 {
+                let _ = app.emit_to(venster.label(), GEBEURTENIS, ());
+            }
         }
         tauri::WindowEvent::Destroyed => {
             let app = venster.app_handle();
@@ -270,7 +299,11 @@ pub fn systeembestanden(
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum Claim {
     /// Nieuw geopend: lees de inhoud met `lees_werkbestand`.
-    Nieuw { token: String, naam: String },
+    Nieuw {
+        token: String,
+        naam: String,
+        neerzetpunt: Option<Neerzetpunt>,
+    },
     /// Staat al open in dit venster.
     Geopend { token: String },
     /// Staat al open in een ander venster; dat venster komt naar voren.
@@ -286,18 +319,19 @@ pub fn claim_systeembestand(
     werkbestanden: tauri::State<'_, crate::werkbestanden::Werkbestanden>,
     id: u64,
 ) -> Result<Claim, String> {
-    let pad = staat
+    let wachtend = staat
         .neem(id, venster.label())
         .ok_or_else(|| crate::taal::t("errors.file.alreadyOpenedOrOtherWindow"))?;
-    Ok(claim(&app, &werkbestanden, pad, venster.label()))
+    Ok(claim(&app, &werkbestanden, wachtend, venster.label()))
 }
 
 fn claim<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     werkbestanden: &crate::werkbestanden::Werkbestanden,
-    pad: PathBuf,
+    wachtend: Wachtend,
     label: &str,
 ) -> Claim {
+    let Wachtend { pad, neerzetpunt, .. } = wachtend;
     match werkbestanden.zoek_pad(&pad) {
         Some((token, eigenaar)) if eigenaar == label => Claim::Geopend { token },
         Some((token, eigenaar)) => match app.get_webview_window(&eigenaar) {
@@ -309,34 +343,43 @@ fn claim<R: tauri::Runtime>(
             // Venster bestaat niet meer: het token is verweesd.
             None => {
                 werkbestanden.vergeet_venster(&eigenaar);
-                nieuw(werkbestanden, pad, label)
+                nieuw(werkbestanden, pad, label, neerzetpunt)
             }
         },
-        None => nieuw(werkbestanden, pad, label),
+        None => nieuw(werkbestanden, pad, label, neerzetpunt),
     }
 }
 
-fn nieuw(werkbestanden: &crate::werkbestanden::Werkbestanden, pad: PathBuf, label: &str) -> Claim {
+fn nieuw(
+    werkbestanden: &crate::werkbestanden::Werkbestanden,
+    pad: PathBuf,
+    label: &str,
+    neerzetpunt: Option<Neerzetpunt>,
+) -> Claim {
     let naam = crate::werkbestanden::bestandsnaam(&pad);
     Claim::Nieuw {
         token: werkbestanden.registreer(pad, label),
         naam,
+        neerzetpunt,
     }
 }
 
-/// Leest het bestand achter een pad-token van dit venster en zet het in de recente lijst.
+/// Leest het bestand achter een pad-token; optioneel wordt het als recent bestand genoteerd.
 #[tauri::command]
 pub async fn lees_werkbestand(
     app: tauri::AppHandle,
     venster: tauri::Window,
     token: String,
+    noteer_recent: Option<bool>,
 ) -> Result<tauri::ipc::Response, String> {
     let label = venster.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
         let werkbestanden = app.state::<crate::werkbestanden::Werkbestanden>();
         let bytes = werkbestanden.lees(&token, &label)?;
-        if let Some(pad) = werkbestanden.pad(&token, &label) {
-            crate::recent::noteer(&app, &pad);
+        if noteer_recent.unwrap_or(true) {
+            if let Some(pad) = werkbestanden.pad(&token, &label) {
+                crate::recent::noteer(&app, &pad);
+            }
         }
         Ok(tauri::ipc::Response::new(bytes))
     })
@@ -433,14 +476,36 @@ mod tests {
             aangeboden,
             vec![Aangeboden {
                 id: 1,
-                naam: "begroting.xlsx".into()
+                naam: "begroting.xlsx".into(),
+                neerzetpunt: None,
             }]
         );
         assert!(staat.voor_venster("document-2").is_empty());
         assert_eq!(staat.neem(1, "document-2"), None);
-        assert_eq!(staat.neem(1, "main"), Some(pad));
+        assert_eq!(
+            staat.neem(1, "main"),
+            Some(Wachtend {
+                pad,
+                venster: "main".into(),
+                neerzetpunt: None,
+            })
+        );
         assert_eq!(staat.neem(1, "main"), None);
         assert!(staat.voor_venster("main").is_empty());
+    }
+
+    #[test]
+    fn neerzetpunt_blijft_bij_het_aangeboden_bestand() {
+        let staat = Systeembestanden::default();
+        staat.voeg_toe_met_punt(
+            vec![PathBuf::from("/x/foto.png")],
+            "main",
+            Some(Neerzetpunt { x: 120.5, y: 240.0 }),
+        );
+        assert_eq!(
+            staat.voor_venster("main")[0].neerzetpunt,
+            Some(Neerzetpunt { x: 120.5, y: 240.0 })
+        );
     }
 
     #[test]

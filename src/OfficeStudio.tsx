@@ -74,6 +74,10 @@ import { noteerBrowser } from "./recent";
 import { useHerstel } from "./useHerstel";
 import { useUpdateBijStart } from "./updates";
 import { neerzetMelding, useNeerzetten } from "./Neerzetzone";
+import {
+  AFBEELDING_DROP_EVENT,
+  isOndersteundBeeldbestand,
+} from "./tekst/afbeelding/neerzetten";
 import { VensterMenu, useVenstermenu } from "./VensterMenu";
 import {
   bevestigFormaat,
@@ -581,8 +585,19 @@ export function OfficeStudio() {
   // Bestanden op het venster slepen (browser; de desktopapp gaat via Rust).
   const neerzetzone = useNeerzetten({
     uit: verlaatvraag || opslaanAls !== null || importvragen.open,
-    open: async (bestanden) => {
+    open: async (bestanden, positie) => {
+      const afbeeldingen =
+        actiefDocument?.soort === "docx" && actiefDocument.gereed
+          ? bestanden.filter(isOndersteundBeeldbestand)
+          : [];
+      if (afbeeldingen.length)
+        window.dispatchEvent(
+          new CustomEvent(AFBEELDING_DROP_EVENT, {
+            detail: { bestanden: afbeeldingen, ...positie },
+          }),
+        );
       for (const bestand of bestanden) {
+        if (afbeeldingen.includes(bestand)) continue;
         while (bezigRef.current) await new Promise((r) => setTimeout(r, 100));
         await openBestand(bestand);
       }
@@ -830,6 +845,7 @@ export function OfficeStudio() {
     naam: string,
     lees: () => Promise<Uint8Array>,
     werkbestand: Werkbestand | null,
+    neerzetpunt?: { x: number; y: number } | null,
   ) {
     // Wacht tot opslaan of een andere opening klaar is; niets valt weg.
     while (bezigRef.current) await new Promise((r) => setTimeout(r, 100));
@@ -848,6 +864,25 @@ export function OfficeStudio() {
       // Database Studio werkt op een kopie; het pad is niet nodig.
       openDatabaseBestand(naam, bytes, "bestand");
       return false;
+    }
+    if (
+      neerzetpunt &&
+      actiefDocument?.soort === "docx" &&
+      actiefDocument.gereed
+    ) {
+      const afbeelding = new File([new Uint8Array(bytes).buffer], naam);
+      if (isOndersteundBeeldbestand(afbeelding)) {
+        window.dispatchEvent(
+          new CustomEvent(AFBEELDING_DROP_EVENT, {
+            detail: {
+              bestanden: [afbeelding],
+              x: neerzetpunt.x,
+              y: neerzetpunt.y,
+            },
+          }),
+        );
+        return false;
+      }
     }
     return (await importeer(naam, bytes, werkbestand)) && !!werkbestand;
   }

@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useInstellingen } from "./instellingen";
 import { kantoorModule } from "../packages/email/src/kantoor";
 import i18next from "./i18n/config";
 import { formatDatum, formatTijd } from "./i18n/opmaak";
@@ -53,7 +54,8 @@ export function RecenteBestanden({
   bladeren: () => void;
 }) {
   const { t } = useTranslation("backstage");
-  const recent = useRecent();
+  const { recent: instellingen } = useInstellingen();
+  const recent = useRecent(instellingen.aantal);
   const [melding, setMelding] = useState("");
   if (!recent.lijst.length) return null;
 

@@ -18,6 +18,7 @@ import type { Werkbestand } from "./werkbestand";
 export interface Aangeboden {
   id: number;
   naam: string;
+  neerzetpunt?: { x: number; y: number } | null;
 }
 
 /**
@@ -28,13 +29,19 @@ export type OpenSysteembestand = (
   naam: string,
   lees: () => Promise<Uint8Array>,
   werkbestand: Werkbestand | null,
+  neerzetpunt?: { x: number; y: number } | null,
 ) => Promise<boolean>;
 
 /** Activeert het tabblad met dit pad-token in dit venster. */
 export type ActiveerWerkbestand = (token: string) => void;
 
 type Claim =
-  | { status: "nieuw"; token: string; naam: string }
+  | {
+      status: "nieuw";
+      token: string;
+      naam: string;
+      neerzetpunt?: { x: number; y: number } | null;
+    }
   | { status: "geopend"; token: string }
   | { status: "elders" };
 
@@ -61,11 +68,13 @@ let gestart = false;
 async function start() {
   const { invoke } = await import("@tauri-apps/api/core");
   const { listen } = await import("@tauri-apps/api/event");
-  const voegToe = maakWachtrij(async ({ id }) => {
+  const voegToe = maakWachtrij(async ({ id, neerzetpunt }) => {
     const claim = await invoke<Claim>("claim_systeembestand", { id });
     if (claim.status === "geopend") activeerder?.(claim.token);
     if (claim.status !== "nieuw") return;
     const { token, naam } = claim;
+    const beeldneerzet =
+      !!neerzetpunt && /\.(png|jpe?g|gif|bmp|webp)$/i.test(naam);
     let gehouden = false;
     try {
       gehouden =
@@ -73,9 +82,13 @@ async function start() {
           naam,
           async () =>
             new Uint8Array(
-              await invoke<ArrayBuffer>("lees_werkbestand", { token }),
+              await invoke<ArrayBuffer>("lees_werkbestand", {
+                token,
+                noteerRecent: !beeldneerzet,
+              }),
             ),
           { token, naam },
+          neerzetpunt,
         )) ?? false;
     } finally {
       if (!gehouden)

@@ -32,7 +32,6 @@ import {
   EMU_PER_CM,
   ONDERSTEUNDE_BEELDEN,
   ZWEVEND,
-  beeldmaat,
   begrensBijsnijding,
   cmNaarPx,
   leesBijsnijding,
@@ -45,6 +44,7 @@ import {
   type HorizontaalTov,
   type VerticaalTov,
 } from "./logica";
+import { leesBeeld } from "./neerzetten";
 
 const VERGRENDELD = "open-tekst-beeldverhouding";
 function leesVergrendeld() {
@@ -53,22 +53,6 @@ function leesVergrendeld() {
   } catch {
     return true;
   }
-}
-
-/** Leest een gekozen beeldbestand als data-URL met zijn pixelmaat. */
-async function leesBeeld(file: File) {
-  if (!ONDERSTEUNDE_BEELDEN.includes(file.type)) throw new Error(i18next.t("writer:picture.errors.unsupported"));
-  if (file.size > 25 * 1024 * 1024) throw new Error(i18next.t("writer:picture.errors.tooLarge", { size: "25 MB" }));
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const natuurlijk = beeldmaat(bytes);
-  if (!natuurlijk) throw new Error(i18next.t("writer:picture.errors.unreadable"));
-  const src = await new Promise<string>((klaar, fout) => {
-    const lezer = new FileReader();
-    lezer.onload = () => klaar(String(lezer.result));
-    lezer.onerror = () => fout(new Error(i18next.t("writer:picture.errors.readFailed")));
-    lezer.readAsDataURL(file);
-  });
-  return { src, natuurlijk };
 }
 
 /**

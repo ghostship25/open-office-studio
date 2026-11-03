@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+import { leesInstellingen } from "./instellingen";
 
 /**
  * Recente bestanden.
  *
- * - **Desktop:** Rust bewaart hooguit 20 paden in de app-gegevensmap
+ * - **Desktop:** Rust bewaart hooguit 100 paden in de app-gegevensmap
  *   (`src-tauri/src/recent.rs`). De webview krijgt per bestand een id, naam,
  *   map, extensie, datum, vastgezet en of het nog bestaat. Openen gaat met het
  *   id via de route van de systeembestanden (dus ook met een pad-token voor
  *   Ctrl+S).
  * - **Browser:** de browser geeft geen paden. We onthouden alleen namen en
- *   datums in localStorage; klikken opent de bestandskiezer.
+ *   datums in sessionStorage; klikken opent de bestandskiezer.
  */
 export interface RecentBestand {
   id: string;
@@ -24,8 +25,9 @@ export interface RecentBestand {
   bestaat: boolean;
 }
 
-export const MAX_RECENT = 20;
-const SLEUTEL = "openaec-office-recent";
+export const MAX_RECENT = 100;
+export const STANDAARD_RECENT = 25;
+const SLEUTEL = "openaec-office-recent-session";
 const desktop =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -40,11 +42,12 @@ export function sorteer<T extends { vast?: boolean; datum: number }>(
   );
 }
 
-/** Zelfde regels als in Rust: geen dubbelen, vastgezette blijven, samen hooguit 20. */
+/** Zelfde regels als in Rust: geen dubbelen, vastgezette blijven, binnen de limiet. */
 export function voegToe(
   lijst: Opgeslagen[],
   naam: string,
   datum: number,
+  limiet = STANDAARD_RECENT,
 ): Opgeslagen[] {
   const sleutel = naam.toLowerCase();
   const vast = lijst.some((i) => i.naam.toLowerCase() === sleutel && i.vast);
@@ -52,14 +55,32 @@ export function voegToe(
     ...lijst.filter((i) => i.naam.toLowerCase() !== sleutel),
     { naam, datum, vast },
   ]);
-  const ruimte = Math.max(0, MAX_RECENT - nieuw.filter((i) => i.vast).length);
+  const ruimte = Math.max(
+    0,
+    Math.min(MAX_RECENT, Math.round(limiet)) -
+      nieuw.filter((i) => i.vast).length,
+  );
+  let los = 0;
+  return nieuw.filter((i) => i.vast || ++los <= ruimte);
+}
+
+function beperk<T extends { vast?: boolean; datum: number }>(
+  lijst: T[],
+  limiet: number,
+): T[] {
+  const nieuw = sorteer(lijst);
+  const ruimte = Math.max(
+    0,
+    Math.min(MAX_RECENT, Math.round(limiet)) -
+      nieuw.filter((i) => i.vast).length,
+  );
   let los = 0;
   return nieuw.filter((i) => i.vast || ++los <= ruimte);
 }
 
 function leesBrowser(): Opgeslagen[] {
   try {
-    const lijst = JSON.parse(localStorage.getItem(SLEUTEL) ?? "[]");
+    const lijst = JSON.parse(sessionStorage.getItem(SLEUTEL) ?? "[]");
     return Array.isArray(lijst)
       ? lijst.filter(
           (i): i is Opgeslagen =>
@@ -74,7 +95,7 @@ function leesBrowser(): Opgeslagen[] {
 const luisteraars = new Set<() => void>();
 function schrijfBrowser(lijst: Opgeslagen[]) {
   try {
-    localStorage.setItem(SLEUTEL, JSON.stringify(lijst));
+    sessionStorage.setItem(SLEUTEL, JSON.stringify(lijst));
   } catch {
     // Zonder opslag blijft de lijst leeg; dat is geen fout.
   }
@@ -96,7 +117,9 @@ function alsBestand(i: Opgeslagen): RecentBestand {
 /** Browser: een geopend of gedownload bestand onthouden (alleen de naam). */
 export function noteerBrowser(naam: string) {
   if (desktop || !naam) return;
-  schrijfBrowser(voegToe(leesBrowser(), naam, Date.now()));
+  schrijfBrowser(
+    voegToe(leesBrowser(), naam, Date.now(), leesInstellingen().recent.aantal),
+  );
 }
 
 async function invoke<T>(opdracht: string, args?: Record<string, unknown>) {
@@ -104,21 +127,25 @@ async function invoke<T>(opdracht: string, args?: Record<string, unknown>) {
   return invoke<T>(opdracht, args);
 }
 
-export function useRecent() {
+export function useRecent(limiet = STANDAARD_RECENT) {
   const [lijst, setLijst] = useState<RecentBestand[]>([]);
   const ververs = useCallback(() => {
     if (!desktop) {
-      setLijst(sorteer(leesBrowser()).map(alsBestand));
+      setLijst(beperk(leesBrowser(), limiet).map(alsBestand));
       return;
     }
     invoke<RecentBestand[]>("recente_bestanden")
-      .then(setLijst)
+      .then((bestanden) => setLijst(beperk(bestanden, limiet)))
       .catch(() => setLijst([]));
-  }, []);
+  }, [limiet]);
 
   useEffect(() => {
     ververs();
     if (!desktop) {
+      const opgeslagen = leesBrowser();
+      const beperkt = beperk(opgeslagen, limiet);
+      if (JSON.stringify(opgeslagen) !== JSON.stringify(beperkt))
+        schrijfBrowser(beperkt);
       luisteraars.add(ververs);
       const opslag = (e: StorageEvent) => e.key === SLEUTEL && ververs();
       window.addEventListener("storage", opslag);
@@ -140,7 +167,7 @@ export function useRecent() {
       stop?.();
       window.removeEventListener("focus", ververs);
     };
-  }, [ververs]);
+  }, [limiet, ververs]);
 
   return {
     lijst,

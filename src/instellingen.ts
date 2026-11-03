@@ -41,6 +41,8 @@ export interface Instellingen {
   };
   /** Tekst: sneltoetsprofiel (LibreOffice-achtig of Word) en de mini-werkbalk bij selectie. */
   tekst: { sneltoetsprofiel: "standaard" | "word"; miniWerkbalk: boolean };
+  /** Maximumaantal bestanden in Recent; vastgezette blijven staan. */
+  recent: { aantal: number };
   /** Automatische updates van de desktopapp (#26, src/updates.ts): controle bij start en kanaal. */
   updates: { automatisch: boolean; kanaal: "stabiel" | "ontwikkel" };
 }
@@ -68,6 +70,7 @@ export const standaardInstellingen: Instellingen = {
     cijferwoordenNegeren: true,
   },
   tekst: { sneltoetsprofiel: "standaard", miniWerkbalk: true },
+  recent: { aantal: 25 },
   // Alle uitgaven zijn (nog) pre-releases; het ontwikkelkanaal neemt ze mee.
   updates: { automatisch: true, kanaal: "ontwikkel" },
 };
@@ -92,6 +95,7 @@ export function normaliseerInstellingen(ruw: unknown): Instellingen {
   const status = isObject(r.statusbalk) ? r.statusbalk : {};
   const spelling = isObject(r.spelling) ? r.spelling : {};
   const tekst = isObject(r.tekst) ? r.tekst : {};
+  const recent = isObject(r.recent) ? r.recent : {};
   const updates = isObject(r.updates) ? r.updates : {};
   return {
     taal: isTaalKeuze(r.taal) ? r.taal : s.taal,
@@ -125,6 +129,12 @@ export function normaliseerInstellingen(ruw: unknown): Instellingen {
     tekst: {
       sneltoetsprofiel: kies(tekst.sneltoetsprofiel, ["standaard", "word"] as const, "standaard"),
       miniWerkbalk: waarOnwaar(tekst.miniWerkbalk, s.tekst.miniWerkbalk),
+    },
+    recent: {
+      aantal:
+        typeof recent.aantal === "number" && Number.isFinite(recent.aantal)
+          ? Math.min(100, Math.max(1, Math.round(recent.aantal)))
+          : s.recent.aantal,
     },
     updates: {
       automatisch: waarOnwaar(updates.automatisch, s.updates.automatisch),

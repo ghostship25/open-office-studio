@@ -6,9 +6,29 @@ use tauri::Manager;
 
 const BESTAND: &str = "voorkeuren.json";
 const MAX_BYTES: usize = 64 * 1024;
+const STANDAARD_RECENT: usize = 25;
+const MAX_RECENT: usize = 100;
 
-fn bestand(app: &tauri::AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|map| map.join(BESTAND))
+fn bestand<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBuf> {
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|map| map.join(BESTAND))
+}
+
+/// Maximumaantal bestanden in Recent; vastgezette blijven staan.
+pub fn limiet_recente<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> usize {
+    bestand(app)
+        .and_then(|pad| fs::read_to_string(pad).ok())
+        .and_then(|inhoud| serde_json::from_str::<serde_json::Value>(&inhoud).ok())
+        .and_then(|waarde| {
+            waarde
+                .get("recent")
+                .and_then(|recent| recent.get("aantal"))
+                .and_then(serde_json::Value::as_u64)
+        })
+        .map(|aantal| aantal.clamp(1, MAX_RECENT as u64) as usize)
+        .unwrap_or(STANDAARD_RECENT)
 }
 
 /// Een JSON-object van hooguit 64 kB; anders een foutmelding.
@@ -38,7 +58,9 @@ pub fn lees_voorkeuren(app: tauri::AppHandle) -> Result<Option<String>, String> 
 #[tauri::command]
 pub fn bewaar_voorkeuren(app: tauri::AppHandle, inhoud: String) -> Result<(), String> {
     controleer(&inhoud)?;
-    let pad = bestand(&app).ok_or_else(|| crate::taal::t("errors.preferences.configDirUnavailable"))?;
+    let oude_limiet = limiet_recente(&app);
+    let pad =
+        bestand(&app).ok_or_else(|| crate::taal::t("errors.preferences.configDirUnavailable"))?;
     let map = pad
         .parent()
         .ok_or_else(|| crate::taal::t("errors.preferences.pathInvalid"))?;
@@ -46,7 +68,11 @@ pub fn bewaar_voorkeuren(app: tauri::AppHandle, inhoud: String) -> Result<(), St
     // Eerst naast het doel schrijven en dan hernoemen: nooit een half bestand.
     let tijdelijk = pad.with_extension("json.tmp");
     fs::write(&tijdelijk, inhoud.as_bytes()).map_err(|e| e.to_string())?;
-    fs::rename(&tijdelijk, &pad).map_err(|e| e.to_string())
+    fs::rename(&tijdelijk, &pad).map_err(|e| e.to_string())?;
+    if limiet_recente(&app) != oude_limiet {
+        crate::recent::pas_limiet_toe(&app);
+    }
+    Ok(())
 }
 
 /// Begintaal van de native teksten: de keuze `taal` uit het voorkeurenbestand

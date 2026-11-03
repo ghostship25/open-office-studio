@@ -36,16 +36,16 @@ function heeftBestanden(e: DragEvent) {
 
 interface Opties {
   /** Browser: de neergezette bestanden, op volgorde. */
-  open: (bestanden: File[]) => void;
+  open: (bestanden: File[], positie: { x: number; y: number }) => void;
   /** Uit terwijl er een dialoog openstaat. */
   uit: boolean;
 }
 
 /**
  * Bestanden op het venster slepen opent ze. In de desktopapp vangt Rust de
- * neergezette paden op (`systeembestanden.rs`, zelfde route als een
- * dubbelklik, met pad-token voor Ctrl+S); hier tonen we alleen de zone. In
- * de browser komen de bestanden als File-objecten binnen.
+ * neergezette paden en positie op (`systeembestanden.rs`, zelfde route als
+ * een dubbelklik, met pad-token voor Ctrl+S); hier tonen we alleen de zone.
+ * In de browser komen de bestanden als File-objecten binnen.
  */
 export function useNeerzetten({ open, uit }: Opties) {
   const { t } = useTranslation("shell");
@@ -98,17 +98,37 @@ export function useNeerzetten({ open, uit }: Opties) {
         return;
       e.preventDefault();
       const bestanden = [...(e.dataTransfer?.files ?? [])];
-      if (bestanden.length) recent.current.open(bestanden);
+      if (bestanden.length)
+        recent.current.open(bestanden, { x: e.clientX, y: e.clientY });
+    };
+    const losOpTekst = (e: DragEvent) => {
+      if (
+        !heeftBestanden(e) ||
+        recent.current.uit ||
+        !(e.target instanceof Element) ||
+        !e.target.closest(".office-tekst")
+      )
+        return;
+      const bestanden = [...(e.dataTransfer?.files ?? [])];
+      if (!bestanden.some((bestand) => /\.(png|jpe?g|gif|bmp|webp)$/i.test(bestand.name)))
+        return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      diepte = 0;
+      setZichtbaar(false);
+      recent.current.open(bestanden, { x: e.clientX, y: e.clientY });
     };
     window.addEventListener("dragenter", binnen);
     window.addEventListener("dragover", boven);
     window.addEventListener("dragleave", weg);
     window.addEventListener("drop", los);
+    window.addEventListener("drop", losOpTekst, true);
     return () => {
       window.removeEventListener("dragenter", binnen);
       window.removeEventListener("dragover", boven);
       window.removeEventListener("dragleave", weg);
       window.removeEventListener("drop", los);
+      window.removeEventListener("drop", losOpTekst, true);
     };
   }, []);
 

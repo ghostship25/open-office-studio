@@ -18,6 +18,11 @@ import { AfbeeldingVenster, kiesNieuweAfbeelding } from "./afbeelding/Afbeelding
 import { MarkeringVoorbeeld, WijzigingenPaneel, wijzigingenWinkel } from "./wijzigingen/Wijzigingen";
 import { usePaneelStaat } from "./zoeken/paneelstaat";
 import { VergelijkVenster, neemPaneelVerzoek } from "./wijzigingen/VergelijkVenster";
+import {
+  AFBEELDING_DROP_EVENT,
+  voegAfbeeldingenIn,
+  type AfbeeldingDrop,
+} from "./afbeelding/neerzetten";
 
 /** Opdrachten die het rechtermuismenu via de registry kan aanroepen. */
 export const MENU_OPDRACHTEN = [
@@ -69,6 +74,18 @@ export function WordHost() {
     ];
     return () => afmelden.forEach((weg) => weg());
   }, [zichtbaar, api, apis.herlaad]);
+
+  useEffect(() => {
+    if (!zichtbaar) return;
+    const neerzetten = (event: Event) => {
+      const { bestanden, x, y } = (event as CustomEvent<AfbeeldingDrop>).detail;
+      void voegAfbeeldingenIn(api(), bestanden, x, y).catch((error) =>
+        meld(fout(error)),
+      );
+    };
+    window.addEventListener(AFBEELDING_DROP_EVENT, neerzetten);
+    return () => window.removeEventListener(AFBEELDING_DROP_EVENT, neerzetten);
+  }, [zichtbaar, api, meld]);
 
   // Enginevensters (Cel splitsen, Eigenschappen, Koppeling) krijgen de focus,
   // zodat Esc en Tab erin werken.

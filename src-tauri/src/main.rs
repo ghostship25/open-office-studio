@@ -200,6 +200,21 @@ fn main() {
         ))
         // Native teksten in de taal van de voorkeuren tot de frontend `zet_taal` meldt.
         .setup(|app| {
+            #[cfg(windows)]
+            {
+                let id: Vec<u16> = "org.openaec.office-studio"
+                    .encode_utf16()
+                    .chain(std::iter::once(0))
+                    .collect();
+                let resultaat = unsafe {
+                    windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+                        id.as_ptr(),
+                    )
+                };
+                if resultaat < 0 {
+                    eprintln!("Windows Jump List niet beschikbaar: HRESULT {resultaat:#x}");
+                }
+            }
             voorkeuren::zet_begintaal(app.handle());
             Ok(())
         })

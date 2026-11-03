@@ -1,4 +1,4 @@
-//! Recente bestanden: hooguit 20 paden in `recent.json` in de app-gegevensmap.
+//! Recente bestanden: hooguit 100 paden in `recent.json` in de app-gegevensmap.
 //!
 //! Alleen paden en tijdstippen, nooit inhoud. De webview krijgt per bestand
 //! een id (afgeleid van het pad), de naam, de map, de extensie, de datum,
@@ -11,7 +11,7 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 
-pub const MAX: usize = 20;
+pub const MAX: usize = 100;
 const BESTAND: &str = "recent.json";
 /// Gebeurtenis voor alle vensters: de lijst is veranderd.
 const GEBEURTENIS: &str = "office-recent";
@@ -67,18 +67,9 @@ pub fn sorteer(lijst: &mut [Item]) {
     lijst.sort_by(|a, b| b.vast.cmp(&a.vast).then(b.datum.cmp(&a.datum)));
 }
 
-/// Zet een pad bovenaan; vastgezette bestanden blijven altijd staan, de rest
-/// wordt ingekort tot samen hooguit `MAX`.
-pub fn voeg_toe(lijst: &mut Vec<Item>, pad: PathBuf, datum: u64) {
-    let vast = lijst
-        .iter()
-        .find(|i| zelfde(&i.pad, &pad))
-        .is_some_and(|i| i.vast);
-    lijst.retain(|i| !zelfde(&i.pad, &pad));
-    lijst.push(Item { pad, datum, vast });
+fn beperk(lijst: &mut Vec<Item>, limiet: usize) {
     sorteer(lijst);
-    let vastgezet = lijst.iter().filter(|i| i.vast).count();
-    let ruimte = MAX.saturating_sub(vastgezet);
+    let ruimte = limiet.saturating_sub(lijst.iter().filter(|i| i.vast).count());
     let mut los = 0;
     lijst.retain(|i| {
         if i.vast {
@@ -87,6 +78,18 @@ pub fn voeg_toe(lijst: &mut Vec<Item>, pad: PathBuf, datum: u64) {
         los += 1;
         los <= ruimte
     });
+}
+
+/// Zet een pad bovenaan; vastgezette bestanden blijven altijd staan, de rest
+/// wordt ingekort tot de ingestelde limiet.
+pub fn voeg_toe(lijst: &mut Vec<Item>, pad: PathBuf, datum: u64, limiet: usize) {
+    let vast = lijst
+        .iter()
+        .find(|i| zelfde(&i.pad, &pad))
+        .is_some_and(|i| i.vast);
+    lijst.retain(|i| !zelfde(&i.pad, &pad));
+    lijst.push(Item { pad, datum, vast });
+    beperk(lijst, limiet.min(MAX));
 }
 
 pub fn weergave(lijst: &[Item]) -> Vec<Weergave> {
@@ -133,6 +136,7 @@ impl Recent {
         let mut slot = self.lijst.lock().unwrap_or_else(|e| e.into_inner());
         let lijst = slot.get_or_insert_with(|| pad.as_deref().map(lees_van).unwrap_or_default());
         let uit = f(lijst);
+        beperk(lijst, crate::voorkeuren::limiet_recente(app));
         if bewaar {
             if let Some(pad) = &pad {
                 if let Some(map) = pad.parent() {
@@ -159,8 +163,31 @@ pub fn noteer<R: tauri::Runtime>(app: &tauri::AppHandle<R>, pad: &Path) {
     } else {
         pad.canonicalize().unwrap_or_else(|_| pad.to_path_buf())
     };
-    app.state::<Recent>()
-        .met(app, true, |lijst| voeg_toe(lijst, pad, nu()));
+    #[cfg(windows)]
+    voeg_toe_aan_snelkoppellijst(&pad);
+    app.state::<Recent>().met(app, true, |lijst| {
+        voeg_toe(lijst, pad, nu(), crate::voorkeuren::limiet_recente(app))
+    });
+}
+
+/// Past een gewijzigde voorkeur direct toe en bewaart de ingekorte lijst.
+pub fn pas_limiet_toe<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    app.state::<Recent>().met(app, true, |_| ());
+}
+
+#[cfg(windows)]
+fn voeg_toe_aan_snelkoppellijst(pad: &Path) {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::{SHAddToRecentDocs, SHARD_PATHW};
+
+    let pad: Vec<u16> = pad
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        SHAddToRecentDocs(SHARD_PATHW as u32, pad.as_ptr().cast());
+    }
 }
 
 #[tauri::command]
@@ -216,11 +243,13 @@ mod tests {
     #[test]
     fn nieuwste_bovenaan_zonder_dubbelen() {
         let mut l = Vec::new();
-        voeg_toe(&mut l, "/a.docx".into(), 1);
-        voeg_toe(&mut l, "/b.xlsx".into(), 2);
-        voeg_toe(&mut l, "/a.docx".into(), 3);
+        voeg_toe(&mut l, "/a.docx".into(), 1, 25);
+        voeg_toe(&mut l, "/b.xlsx".into(), 2, 25);
+        voeg_toe(&mut l, "/a.docx".into(), 3, 25);
         assert_eq!(
-            l.iter().map(|i| i.pad.to_str().unwrap()).collect::<Vec<_>>(),
+            l.iter()
+                .map(|i| i.pad.to_str().unwrap())
+                .collect::<Vec<_>>(),
             ["/a.docx", "/b.xlsx"]
         );
     }
@@ -228,18 +257,28 @@ mod tests {
     #[test]
     fn hooguit_twintig_en_vastgezette_blijven() {
         let mut l = Vec::new();
-        voeg_toe(&mut l, "/vast.docx".into(), 0);
+        voeg_toe(&mut l, "/vast.docx".into(), 0, 19);
         l[0].vast = true;
-        for n in 1..=30 {
-            voeg_toe(&mut l, format!("/{n}.docx").into(), n);
+        for n in 1..=110 {
+            voeg_toe(&mut l, format!("/{n}.docx").into(), n, 20);
         }
-        assert_eq!(l.len(), MAX);
+        assert_eq!(l.len(), 20);
         assert_eq!(l[0].pad, PathBuf::from("/vast.docx"));
-        assert_eq!(l[1].pad, PathBuf::from("/30.docx"));
+        assert_eq!(l[1].pad, PathBuf::from("/110.docx"));
         assert!(!l.iter().any(|i| i.pad == PathBuf::from("/11.docx")));
         // Opnieuw openen houdt het vastzetten vast.
-        voeg_toe(&mut l, "/vast.docx".into(), 99);
+        voeg_toe(&mut l, "/vast.docx".into(), 99, 20);
         assert!(l[0].vast);
+    }
+
+    #[test]
+    fn standaardlimiet_is_vijfentwintig() {
+        let mut l = Vec::new();
+        for n in 1..=100 {
+            voeg_toe(&mut l, format!("/{n}.docx").into(), n, 25);
+        }
+        assert_eq!(l.len(), 25);
+        assert_eq!(l[0].pad, PathBuf::from("/100.docx"));
     }
 
     #[test]

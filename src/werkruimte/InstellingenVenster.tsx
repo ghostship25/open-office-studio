@@ -287,6 +287,7 @@ function Algemeen({
   wijzig: (wijziging: Wijziging) => void;
 }) {
   const { t } = useTranslation("settings");
+  const { t: tb } = useTranslation("backstage");
   const id = useId();
   const { instellingen } = concept;
   const automatisch = bepaalTaal("auto");
@@ -338,6 +339,21 @@ function Algemeen({
             />
           </Rij>
         ))}
+        <Rij label={tb("recent.title")} id={`${id}-recent`}>
+          <input
+            id={`${id}-recent`}
+            className="instellingen-invoer"
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={instellingen.recent.aantal}
+            onChange={(e) =>
+              wijzig({ recent: { aantal: Number(e.target.value) } })
+            }
+          />
+        </Rij>
+        <p className="instellingen-uitleg">{tb("recent.hintDesktop")}</p>
         <Rij label={t("general.recoveryInterval")} id={`${id}-herstel`}>
           <span className="instellingen-eenheid">
             <input
