@@ -3,6 +3,7 @@ import {
   somVan,
   cellenNaarTekst,
   cmNaarTwips,
+  cursorZichtbaarBijSchuifherstel,
   gelijkeKolommen,
   gemiddeldeRijhoogte,
   leesDatum,
@@ -50,6 +51,16 @@ describe("kolombreedtes", () => {
   it("berekent een gemiddelde rijhoogte", () => {
     expect(gemiddeldeRijhoogte(100, 4)).toBe(375);
     expect(gemiddeldeRijhoogte(0, 4)).toBeNull();
+  });
+});
+
+describe("scrollpositie bij celuitlijning", () => {
+  it("herstelt de eerdere positie als de cursor daar zichtbaar blijft", () => {
+    expect(cursorZichtbaarBijSchuifherstel(160, 180, 80, 100, 300)).toBe(true);
+  });
+  it("laat scrollen toe als de cursor op de eerdere positie buiten beeld valt", () => {
+    expect(cursorZichtbaarBijSchuifherstel(240, 260, 80, 100, 300)).toBe(false);
+    expect(cursorZichtbaarBijSchuifherstel(-10, 10, 80, 100, 300)).toBe(false);
   });
 });
 

@@ -12,6 +12,21 @@ export const MIN_KOLOM = 230;
 export const cmNaarTwips = (cm: number) => Math.round(cm * TWIPS_PER_CM);
 export const twipsNaarCm = (twips: number) => Math.round((twips / TWIPS_PER_CM) * 100) / 100;
 
+/** Of de cursor zichtbaar blijft na terugzetten naar de eerdere scrollpositie. */
+export function cursorZichtbaarBijSchuifherstel(
+  cursorBoven: number,
+  cursorOnder: number,
+  schuifverschil: number,
+  zichtbaarBoven: number,
+  zichtbaarOnder: number,
+) {
+  const geprojecteerdBoven = cursorBoven + schuifverschil;
+  const geprojecteerdOnder = cursorOnder + schuifverschil;
+  return (
+    geprojecteerdBoven >= zichtbaarBoven && geprojecteerdOnder <= zichtbaarOnder
+  );
+}
+
 /** Kolommen `van`..`tot` (inclusief) krijgen samen dezelfde breedte, gelijk verdeeld. */
 /** `aantal` gelijke kolommen (hele twips) die samen precies `breedte` zijn. */
 export function gelijkeKolommen(breedte: number, aantal: number): number[] {

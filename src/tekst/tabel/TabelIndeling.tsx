@@ -31,7 +31,7 @@ import { openVenster } from "../gedeeld/vensters";
 import { Dialoog } from "../../werkruimte/Dialoog";
 import "../../werkruimte/werkruimte.css";
 import { EigenKnop } from "../../lint/tekst-opdrachten";
-import { useEditorApi } from "../../lint/editorApi";
+import { zichtbaarElement, useEditorApi } from "../../lint/editorApi";
 import { Keuzemenu, Maatveld, getalUit, toonGetal, useEditorTik, useUitvoeren } from "../gedeeld/ui";
 import { engine } from "../gedeeld/engine";
 import {
@@ -54,6 +54,7 @@ import {
 import { splitsTabel } from "./pakket";
 import {
   cmNaarTwips,
+  cursorZichtbaarBijSchuifherstel,
   raadScheiding,
   raadSoort,
   tekstNaarCellen,
@@ -90,6 +91,37 @@ export function TabelIndeling() {
   const reden = voorstel ? t("table.unavailableWhileTracking") : undefined;
   const setVenster = (id: "rij" | "marges" | "sorteren" | "naarTekst") => openVenster(api.tekst, `tabel.${id}`);
   const splitsen = () => uitvoeren((ref) => splitsHuidigeTabel(ref, api.herlaad), false);
+  const uitlijnen = (uitlijning: "top" | "center" | "bottom") =>
+    uitvoeren((ref) => {
+      const scroller = zichtbaarElement<HTMLElement>(
+        ".office-tekst .docx-editor__scroll-container",
+      );
+      const scrollTop = scroller?.scrollTop;
+      celUitlijning(ref, uitlijning);
+      requestAnimationFrame(() => {
+        ref?.focus();
+        if (!scroller || scrollTop === undefined) return;
+        const selectie = document.getSelection();
+        if (!selectie?.focusNode) return;
+        const cursor = document.createRange();
+        cursor.setStart(selectie.focusNode, selectie.focusOffset);
+        cursor.collapse(true);
+        const cursorRect = cursor.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        const zichtbaarBoven = scrollerRect.top + scroller.clientTop;
+        const zichtbaarOnder = zichtbaarBoven + scroller.clientHeight;
+        if (
+          cursorZichtbaarBijSchuifherstel(
+            cursorRect.top,
+            cursorRect.bottom,
+            scroller.scrollTop - scrollTop,
+            zichtbaarBoven,
+            zichtbaarOnder,
+          )
+        )
+          scroller.scrollTop = scrollTop;
+      });
+    }, false);
 
   return (
     <>
@@ -142,7 +174,7 @@ export function TabelIndeling() {
             actief={staat?.verticaal === "top"}
             disabled={uit}
             uitleg={reden ?? t("table.buttons.alignTopTip")}
-            onClick={() => uitvoeren((r) => celUitlijning(r, "top"))}
+            onClick={() => uitlijnen("top")}
           />
           <EigenKnop
             naam={t("table.buttons.alignCenter")}
@@ -150,7 +182,7 @@ export function TabelIndeling() {
             actief={staat?.verticaal === "center"}
             disabled={uit}
             uitleg={reden ?? t("table.buttons.alignCenterTip")}
-            onClick={() => uitvoeren((r) => celUitlijning(r, "center"))}
+            onClick={() => uitlijnen("center")}
           />
           <EigenKnop
             naam={t("table.buttons.alignBottom")}
@@ -158,7 +190,7 @@ export function TabelIndeling() {
             actief={staat?.verticaal === "bottom"}
             disabled={uit}
             uitleg={reden ?? t("table.buttons.alignBottomTip")}
-            onClick={() => uitvoeren((r) => celUitlijning(r, "bottom"))}
+            onClick={() => uitlijnen("bottom")}
           />
         </div>
         <div className="ribbon-stapel">
@@ -240,6 +272,7 @@ export function TabelIndeling() {
     </>
   );
 }
+
 
 /** De tabelvensters, geopend via ../gedeeld/vensters.ts (lint of rechtermuismenu). */
 export function TabelVenster({ id, gegevens, sluit }: { id: string; gegevens?: unknown; sluit: () => void }) {
@@ -606,4 +639,3 @@ function TekstNaarTabelVenster({ alineas, sluit }: { alineas: string[]; sluit: (
     </Dialoog>
   );
 }
-
