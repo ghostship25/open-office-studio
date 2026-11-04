@@ -67,7 +67,8 @@ import {
   type PlakKeuze,
   tabelUitKlembord,
 } from "./plakopties";
-import { kanTabelPlakken, plakTabel } from "../tabel/opdrachten";
+import { kanTabelPlakken, plakTabel, tabelEmbed } from "../tabel/opdrachten";
+import { volgendeCel, tabelCursor, zetCelCursor } from "../tabel/tabVolgende";
 import { DatumTijdDialoog } from "./DatumTijdDialoog";
 import { ontbrekendeStijl } from "../stijlen/model";
 import { metHeleAlinea } from "../stijlen/toepassen";
@@ -258,6 +259,40 @@ export function TekstBewerken({
         naam: naamVanOpdracht(id, args),
         uitvoeren: () => voerUit(id, args as never),
       });
+    };
+    window.addEventListener("keydown", toets, true);
+    return () => window.removeEventListener("keydown", toets, true);
+  }, [zichtbaar]);
+
+  // Gebruik de fysieke celvolgorde van de tabel; de engine slaat soms cellen over.
+  useEffect(() => {
+    if (!zichtbaar) return;
+    const toets = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+      if (!(e.target instanceof HTMLElement) || !e.target.classList.contains("paged-editor__yrs-input")) return;
+      if (!recent.current.bewerkbaar) return;
+      const ref = api();
+      if (!ref) return;
+      const cursor = tabelCursor(ref);
+      if (!cursor) return;
+      const volgende = volgendeCel(cursor.payload, cursor.cel);
+      if (volgende) {
+        e.preventDefault();
+        e.stopPropagation();
+        zetCelCursor(ref, cursor.tabel, volgende);
+        return;
+      }
+      if (!store.getState("tableAction", "addRowBelow").enabled) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rijen = cursor.payload.rows.length;
+      grens();
+      store.execute("tableAction", "addRowBelow").then((resultaat) => {
+        grens();
+        if (!resultaat.ok) return fout(new Error(resultaat.failure.message));
+        const payload = tabelEmbed(cursor.e.sessie, cursor.tabel).payload;
+        if (payload.rows.length > rijen) zetCelCursor(ref, cursor.tabel, { row: rijen, column: 0 });
+      }).catch(melding);
     };
     window.addEventListener("keydown", toets, true);
     return () => window.removeEventListener("keydown", toets, true);
