@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DocxEditor, type DocxEditorRef } from "@betteroffice/docx-react";
 import { configureDefaultFonts } from "@betteroffice/docx/layout";
 import { XlsxEditor, type XlsxEditorApi } from "@betteroffice/xlsx-react";
+import { bewaakInvoer } from "./rekenblad/formuleBewaker";
 import { PptxEditor, type PptxEditorApi } from "@betteroffice/pptx-react";
 import type { PptxFontFace } from "@betteroffice/pptx";
 import "@betteroffice/docx-react/styles.css";
@@ -258,6 +259,7 @@ export default function OfficeEditor(props: EditorProps) {
   const gereedXlsx = useCallback(
     (api: XlsxEditorApi) => {
       setRekenbladApi(api);
+      const stopBewaking = bewaakInvoer(api.handle);
       const stopWijziging = registreerWijziging(api.handle, () =>
         recent.current.gewijzigd(),
       );
@@ -294,6 +296,7 @@ export default function OfficeEditor(props: EditorProps) {
       herladenRecent.current.naXlsx(api);
       return () => {
         stopWijziging();
+        stopBewaking();
         setRekenbladApi(null);
         props.registreer(null);
       };
