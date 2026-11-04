@@ -216,19 +216,28 @@ export function useTekstOpdrachten({
           if (tekst) voegIn(tekst);
         }
       })
-      .catch(() => plakken());
+      .catch(() => plakViaWebview());
+  }
+  /**
+   * Zonder leesrecht (bijvoorbeeld in een webview op Linux): de eigen plakopdracht
+   * van de webview laten lopen. Die levert dezelfde plakgebeurtenis als Ctrl+V.
+   */
+  function plakViaWebview() {
+    editor().focus();
+    let gelukt = false;
+    try {
+      gelukt = document.execCommand("paste");
+    } catch {
+      gelukt = false;
+    }
+    if (!gelukt) meld(t("writer.errors.pasteNotAllowed", { shortcut: "Ctrl+V" }));
   }
   function plakken() {
-    if (!navigator.clipboard?.readText) {
-      meld(t("writer.errors.pasteNotAllowed", { shortcut: "Ctrl+V" }));
-      return;
-    }
+    if (!navigator.clipboard?.readText) return plakViaWebview();
     navigator.clipboard
       .readText()
       .then((tekst) => tekst && voegIn(tekst))
-      .catch(() =>
-        meld(t("writer.errors.pasteNotAllowed", { shortcut: "Ctrl+V" })),
-      );
+      .catch(() => plakViaWebview());
   }
 
   async function selectieInAlinea() {
