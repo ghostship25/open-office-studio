@@ -281,23 +281,26 @@ export function useTekstOpdrachten({
             },
           }
         : {};
-      const resultaat = await ref.applyEdits({
-        expectVersion: versie,
-        steps: vervangingen.map((v) => ({
-          op: "replaceText" as const,
-          target: {
-            kind: "range" as const,
-            story: alinea.story,
-            start: { paraId: alinea.paraId, offset: v.begin },
-            end: { paraId: alinea.paraId, offset: v.eind },
-            view: "accepted" as const,
-          },
-          text: v.tekst,
-          ...voorstel,
-        })),
-      });
-      if (!resultaat.ok)
-        throw new Error(t("writer.errors.caseFailed"));
+      let verwacht = versie;
+      for (let i = 0; i < vervangingen.length; i += 100) {
+        const resultaat = await ref.applyEdits({
+          expectVersion: verwacht,
+          steps: vervangingen.slice(i, i + 100).map((v) => ({
+            op: "replaceText" as const,
+            target: {
+              kind: "range" as const,
+              story: alinea.story,
+              start: { paraId: alinea.paraId, offset: v.begin },
+              end: { paraId: alinea.paraId, offset: v.eind },
+              view: "accepted" as const,
+            },
+            text: v.tekst,
+            ...voorstel,
+          })),
+        });
+        if (!resultaat.ok) throw new Error(t("writer.errors.caseFailed"));
+        verwacht = resultaat.version;
+      }
       ref.focus();
     } catch (error) {
       fout(error);
