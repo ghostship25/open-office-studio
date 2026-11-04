@@ -54,6 +54,7 @@ import {
 } from "./kwast";
 import { puntStap, volgendeGrootte } from "./groottereeks";
 import { editorGeschiedenis, splitsStap, splitsStapGedaan } from "../tabel/splitsGeschiedenis";
+import { lijstVan } from "../lijst/model";
 import { HERHAALBAAR, Herhaalgeheugen, naamVanOpdracht } from "./herhalen";
 import { Herhaalmelding } from "./herhaalmelding";
 import {
@@ -285,6 +286,46 @@ export function TekstBewerken({
     window.addEventListener("keydown", toets, true);
     return () => window.removeEventListener("keydown", toets, true);
   }, [zichtbaar, herlaad]);
+
+  // Enter in een lijstalinea zet de lijst voort op de nieuwe alinea (#123).
+  useEffect(() => {
+    if (!zichtbaar) return;
+    const toets = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+      if (!(e.target instanceof HTMLElement) || !e.target.classList.contains("paged-editor__yrs-input")) return;
+      if (!recent.current.bewerkbaar) return;
+      const sessie = api()?.getEditorRef()?.getYrsSession();
+      const sel = sessie?.selection();
+      if (!sessie || !sel) return;
+      let bron: { paraId: string; numPr: { numId: number; ilvl: number }; leeg: boolean } | null = null;
+      try {
+        const alineas = sessie.paragraphs(sel.anchor.story);
+        const a = alineas.find((x) => x.paraId === sel.anchor.paraId);
+        const lijst = lijstVan(a?.properties);
+        if (a && lijst) bron = { paraId: a.paraId, numPr: lijst, leeg: a.text === "" };
+      } catch {
+        return;
+      }
+      if (!bron || bron.leeg) return;
+      const { paraId, numPr } = bron;
+      setTimeout(() => {
+        try {
+          const nu = sessie.selection();
+          if (!nu || nu.anchor.paraId === paraId) return;
+          const a = sessie.paragraphs(nu.anchor.story).find((x) => x.paraId === nu.anchor.paraId);
+          if (!a || lijstVan(a.properties)) return;
+          sessie.setParagraphAttrs(
+            { story: nu.anchor.story, start: { paraId: a.paraId, offset: 0 }, end: { paraId: a.paraId, offset: 0 } },
+            { numPr },
+          );
+        } catch {
+          // Geen sessie meer: niets voort te zetten.
+        }
+      }, 0);
+    };
+    window.addEventListener("keydown", toets, true);
+    return () => window.removeEventListener("keydown", toets, true);
+  }, [zichtbaar]);
 
   // Gebruik de fysieke celvolgorde van de tabel; de engine slaat soms cellen over.
   useEffect(() => {
