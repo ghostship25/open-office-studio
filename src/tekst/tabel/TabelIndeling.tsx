@@ -52,6 +52,7 @@ import {
   type TabelStaat,
 } from "./opdrachten";
 import { splitsTabel } from "./pakket";
+import { onthoudSplitsing } from "./splitsGeschiedenis";
 import {
   cmNaarTwips,
   raadScheiding,
@@ -74,7 +75,9 @@ export async function splitsHuidigeTabel(ref: DocxEditorRef | null, herlaad: Her
   if (!herlaad) throw new Error(i18next.t("writer:table.errors.notReady"));
   await e.ref.flushPendingInput();
   const bytes = await herlaad.bytes();
-  herlaad.vervang(splitsTabel(bytes, s.plek.tabel.tableIndex, s.plek.rijen[0]));
+  const nieuw = splitsTabel(bytes, s.plek.tabel.tableIndex, s.plek.rijen[0]);
+  onthoudSplitsing(herlaad, bytes, nieuw);
+  herlaad.vervang(nieuw);
 }
 
 /** Groepen voor het contexttabblad Tabelopmaak. */

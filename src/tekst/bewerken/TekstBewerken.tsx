@@ -53,6 +53,7 @@ import {
   type KwastStaat,
 } from "./kwast";
 import { puntStap, volgendeGrootte } from "./groottereeks";
+import { splitsingOngedaan, splitsingOpnieuw } from "../tabel/splitsGeschiedenis";
 import { HERHAALBAAR, Herhaalgeheugen, naamVanOpdracht } from "./herhalen";
 import { Herhaalmelding } from "./herhaalmelding";
 import {
@@ -263,6 +264,31 @@ export function TekstBewerken({
     window.addEventListener("keydown", toets, true);
     return () => window.removeEventListener("keydown", toets, true);
   }, [zichtbaar]);
+
+  // Na Tabel splitsen is de editor-geschiedenis leeg: Ctrl+Z/Ctrl+Y draaien die stap zelf terug (#139).
+  useEffect(() => {
+    if (!zichtbaar || !herlaad) return;
+    const toets = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.isComposing) return;
+      if (!(e.target instanceof HTMLElement) || !e.target.classList.contains("paged-editor__yrs-input")) return;
+      const k = e.key.toLowerCase();
+      const opnieuw = k === "y" || (k === "z" && e.shiftKey);
+      if (k !== "z" && k !== "y") return;
+      const weergave = api()?.getEditorRef() as
+        | { canUndo?: () => boolean; canRedo?: () => boolean }
+        | null
+        | undefined;
+      const bytes = opnieuw
+        ? splitsingOpnieuw(herlaad, weergave?.canRedo?.() ?? true)
+        : splitsingOngedaan(herlaad, weergave?.canUndo?.() ?? true);
+      if (!bytes) return;
+      e.preventDefault();
+      e.stopPropagation();
+      herlaad.vervang(bytes);
+    };
+    window.addEventListener("keydown", toets, true);
+    return () => window.removeEventListener("keydown", toets, true);
+  }, [zichtbaar, herlaad]);
 
   // Gebruik de fysieke celvolgorde van de tabel; de engine slaat soms cellen over.
   useEffect(() => {
