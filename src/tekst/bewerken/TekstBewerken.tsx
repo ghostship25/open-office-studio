@@ -53,7 +53,7 @@ import {
   type KwastStaat,
 } from "./kwast";
 import { puntStap, volgendeGrootte } from "./groottereeks";
-import { splitsingOngedaan, splitsingOpnieuw } from "../tabel/splitsGeschiedenis";
+import { editorGeschiedenis, splitsStap, splitsStapGedaan } from "../tabel/splitsGeschiedenis";
 import { HERHAALBAAR, Herhaalgeheugen, naamVanOpdracht } from "./herhalen";
 import { Herhaalmelding } from "./herhaalmelding";
 import {
@@ -274,16 +274,12 @@ export function TekstBewerken({
       const k = e.key.toLowerCase();
       const opnieuw = k === "y" || (k === "z" && e.shiftKey);
       if (k !== "z" && k !== "y") return;
-      const weergave = api()?.getEditorRef() as
-        | { canUndo?: () => boolean; canRedo?: () => boolean }
-        | null
-        | undefined;
-      const bytes = opnieuw
-        ? splitsingOpnieuw(herlaad, weergave?.canRedo?.() ?? true)
-        : splitsingOngedaan(herlaad, weergave?.canUndo?.() ?? true);
+      const weergave = api()?.getEditorRef();
+      const bytes = splitsStap(herlaad, opnieuw, editorGeschiedenis(weergave));
       if (!bytes) return;
       e.preventDefault();
       e.stopPropagation();
+      splitsStapGedaan(opnieuw);
       herlaad.vervang(bytes);
     };
     window.addEventListener("keydown", toets, true);

@@ -16,7 +16,16 @@ import {
   type PptxCommandId,
   type PptxSelectCommandId,
 } from "@betteroffice/pptx-react";
+import { useSyncExternalStore } from "react";
 import { Undo2, Redo2, ZoomIn, type LucideIcon } from "lucide-react";
+import { useEditorTik } from "../tekst/gedeeld/ui";
+import {
+  editorGeschiedenis,
+  splitsStap,
+  splitsStapGedaan,
+  splitsingVersie,
+  volgSplitsing,
+} from "../tekst/tabel/splitsGeschiedenis";
 import { useTranslation } from "react-i18next";
 import { formatProcent } from "../i18n/opmaak";
 import { LettertypeKeuze } from "../lettertypen/LettertypeKeuze";
@@ -105,6 +114,29 @@ export function PK({
     <OpdrachtKeuze opdracht={usePptxCommand(id)} naam={naam} breed={breed} />
   );
 }
+/** Ongedaan/Opnieuw voor Tekst; kent ook de stap Tabel splitsen (#139). */
+function TekstGeschiedenisKnop({ opnieuw, naam, icoon }: Knop & { opnieuw: boolean }) {
+  const basis = useDocxCommand(opnieuw ? "redo" : "undo");
+  const api = useEditorApi();
+  useSyncExternalStore(volgSplitsing, splitsingVersie);
+  useEditorTik();
+  const herlaad = api.herlaad;
+  const bytes = herlaad
+    ? splitsStap(herlaad, opnieuw, editorGeschiedenis(api.tekst()?.getEditorRef()))
+    : null;
+  const opdracht: GebondenOpdracht = bytes
+    ? {
+        ...basis,
+        state: { ...basis.state, enabled: true },
+        execute: async () => {
+          splitsStapGedaan(opnieuw);
+          herlaad!.vervang(bytes);
+          return { ok: true };
+        },
+      }
+    : basis;
+  return <OpdrachtKnop naam={naam} icoon={icoon} opdracht={opdracht} />;
+}
 export function Geschiedenis({
   soort,
 }: {
@@ -118,8 +150,8 @@ export function Geschiedenis({
       <div className="ribbon-stapel">
         {soort === "tekst" ? (
           <>
-            <W id="undo" naam={ongedaan} icoon={Undo2} />
-            <W id="redo" naam={opnieuw} icoon={Redo2} />
+            <TekstGeschiedenisKnop opnieuw={false} naam={ongedaan} icoon={Undo2} />
+            <TekstGeschiedenisKnop opnieuw naam={opnieuw} icoon={Redo2} />
           </>
         ) : soort === "rekenblad" ? (
           <>
