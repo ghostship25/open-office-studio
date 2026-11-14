@@ -81,6 +81,16 @@ In de gerichte Writer-GUI is `Naam\tAantal\nHout\t3` omgezet naar een tabel van 
 
 Bij het wisselen van het geïmporteerde canvas naar Markdown geeft de browserconsole eenmaal `TypeError: Cannot read properties of null (reading 'offsetHeight')` vanuit de maatobserver in `src/notities/TekstCanvas.tsx`. De callback leest `kader.current` nadat het schermonderdeel verwijderd is. De pagina blijft bruikbaar; de onafhankelijke back-upcontrole en het herladen tonen behoud van de gegevens. Deze release herstelt de observer nog niet.
 
+## Hersteld na deze controle
+
+De drie hierboven bevestigde fouten zijn na 30 oktober aangepakt.
+
+- **Woordtelling van een document met alleen een tabel** — hersteld in `912894a`. De nieuwe `leesAlleAlineas` in `src/tekst/gedeeld/engine.ts` leest het hoofdverhaal én de cellen van de tabellen daarin; elke cel is een eigen verhaal (`body:t0:r0c0`). De woordenlijst, de statusbalk en de documenteigenschappen gebruiken hem nu. Vier gerichte proeven in `src/tekst/gedeeld/engine.test.ts` dekken de tabelcellen, een document met alleen een tabel, één mislukt verhaal en een volledig onleesbaar document.
+- **Maatobserver bij notitiesectiewissel** — hersteld in `c941db6`. De callback meet alleen nog als het element nog in het document zit (`isConnected`), zodat een laat aflopende waarnemer geen `offsetHeight` van een verwijderd element meer leest.
+- **Functiepreview bij `ISOWEEKNUM`** — beperkt in `fe355bd`. Alleen de lege aanroep `ISOWEEKNUM()` wordt nog overgeslagen; een formule met argument toont weer een voorbeeld. De crash in de rekenkern zelf blijft bestaan tot de update naar `@betteroffice/xlsx` 0.5.1 (PR #121); de afscherming van invoer, klembord en import is daarmee nog niet rond.
+
+De typecontrole en de vier nieuwe proeven zijn op deze bron uitgevoerd; de GUI- en native proeven hierboven zijn niet herhaald.
+
 ## Definitieve uitgave en platformpoorten
 
 [Release 2026-W44.8](https://github.com/OpenAEC-Foundation/open-office-studio/releases/tag/v2026.44.8) is openbaar. De gebouwde bron is `0fc4d2bbf94bb6025d8d8517d53631d5f830cd1e`; de releasewijziging is gemerged als `33e27b30cf9175dade85d6a6ec8f36061d7738bb`. De twee revisies hebben dezelfde bestandsinhoud. De [volledige releasebouw](https://github.com/OpenAEC-Foundation/open-office-studio/actions/runs/41033563527) is geslaagd.
