@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import i18next from "./i18n/config";
+import { bijOpenen, risiconaam, hoofdletter } from "./import/rapport";
 import { DocumentOpslag } from "./opslag";
 import {
   GEHEUGENGRENS,
@@ -27,6 +28,8 @@ import {
   type NieuweMelding,
   type Toon,
 } from "./meldingenWinkel";
+import { controleerPakket } from "./pakketcontrole";
+import type { Rapport } from "./import/rapport";
 
 type Serialiseer = () => Promise<Uint8Array>;
 
@@ -147,6 +150,24 @@ export function useTabbladen(opties: Opties) {
       voegMeldingToe({ tabblad: id, toon: "info", tekst: document.melding });
     if (nieuwTabblad && document.rapport)
       voegMeldingToe(rapportMelding(id, document.rapport, document.naam));
+    if (nieuwTabblad && !document.rapport && document.bytes) {
+      const controle = controleerPakket(document.bytes, document.soort);
+      if (controle.risicos.length) {
+        const regels: Rapport[] = [];
+        for (const risico of controle.risicos) {
+          const gevolg = bijOpenen(risico, document.soort);
+          if (gevolg)
+            regels.push({ onderdeel: hoofdletter(risico), gevolg });
+        }
+        if (regels.length) {
+          const items = regels.map((r) => r.onderdeel).join(", ");
+          const kop = items.length
+            ? i18next.t("report.head.partial", { items })
+            : i18next.t("shell:tabs.memoryWarning");
+          voegMeldingToe({ tabblad: id, toon: "waarschuwing", tekst: kop, rapport: { rapport: { moment: "openen", kop, regels }, bestandsnaam: document.naam } });
+        }
+      }
+    }
     if (!opslagen.current.has(id)) {
       const opslag = new DocumentOpslag();
       opslag.wissel();
