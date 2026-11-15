@@ -62,7 +62,7 @@ const RISICOSLEUTEL: Record<Risico, string> = {
 };
 
 /** Leesbare naam van een risico in de interfacetaal (kleine letter, voor in een zin). */
-export function risiconaam(risico: Risico) {
+function risiconaam(risico: Risico) {
   return t(`report.risks.${RISICOSLEUTEL[risico]}`);
 }
 
@@ -73,7 +73,7 @@ function kleineLetter(tekst: string) {
     : tekst.charAt(0).toLowerCase() + tekst.slice(1);
 }
 
-export function hoofdletter(tekst: string) {
+function hoofdletter(tekst: string) {
   return tekst.charAt(0).toUpperCase() + tekst.slice(1);
 }
 
@@ -82,7 +82,7 @@ export function hoofdletter(tekst: string) {
  * eigen formaat rechtstreeks wordt geopend. Alleen wat echt beperkt is staat
  * hier; gewone onderdelen zoals revisies of notities melden we niet.
  */
-export function bijOpenen(risico: Risico, soort: Soort): string | null {
+function bijOpenen(risico: Risico, soort: Soort): string | null {
   // Bij DOCX en PPTX is het behoud via de engine in de testmatrix gemeten.
   const behoud = () =>
     soort === "xlsx"

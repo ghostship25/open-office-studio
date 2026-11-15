@@ -1,11 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import i18next from "./i18n/config";
-import {
-  bijOpenen,
-  risiconaam,
-  hoofdletter,
-  type Rapportregel,
-} from "./import/rapport";
+import { openRapport } from "./import/rapport";
 import { DocumentOpslag } from "./opslag";
 import {
   GEHEUGENGRENS,
@@ -156,32 +151,21 @@ export function useTabbladen(opties: Opties) {
       voegMeldingToe(rapportMelding(id, document.rapport, document.naam));
     if (nieuwTabblad && !document.rapport && document.bytes) {
       // Zonder vooraf bijgevoegd rapport (slepen en neerzetten, omzetting):
-      // zelf de pakketcontrole doen, zodat de melding over beperkte
-      // ondersteuning ook op deze openroute verschijnt.
+      // zelf de pakketcontrole doen en het rapport door dezelfde
+      // `openRapport` halen als de importroute, zodat de teksten niet
+      // uiteenlopen. Macro's tellen mee, ook als er verder niets opvalt.
       try {
-        const regels: Rapportregel[] = [];
-        const namen: string[] = [];
-        for (const risico of controleerPakket(document.bytes, document.soort)
-          .risicos) {
-          const gevolg = bijOpenen(risico, document.soort);
-          if (!gevolg) continue;
-          regels.push({ onderdeel: hoofdletter(risiconaam(risico)), gevolg });
-          namen.push(risiconaam(risico));
-        }
-        if (regels.length) {
-          const kop = i18next.t("import:report.head.partial", {
-            items: namen.join(", "),
-          });
-          voegMeldingToe({
-            tabblad: id,
-            toon: "waarschuwing",
-            tekst: kop,
-            rapport: {
-              rapport: { moment: "openen", kop, regels },
-              bestandsnaam: document.naam,
-            },
-          });
-        }
+        const controle = controleerPakket(document.bytes, document.soort);
+        const rapport = openRapport({
+          soort: document.soort,
+          risicos: controle.risicos,
+          macros: controle.macros,
+          route: "engine",
+          bronformaat:
+            document.naam.split(".").pop()?.toLowerCase() || document.soort,
+        });
+        if (rapport)
+          voegMeldingToe(rapportMelding(id, rapport, document.naam));
       } catch {
         // Geen leesbaar OOXML-pakket: dan valt er ook niets te melden.
         // Openen gaat gewoon door; de editor of de import meldt de fout zelf.
