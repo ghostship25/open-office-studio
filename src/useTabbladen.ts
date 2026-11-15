@@ -1,6 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import i18next from "./i18n/config";
-import { bijOpenen, risiconaam, hoofdletter } from "./import/rapport";
+import {
+  bijOpenen,
+  risiconaam,
+  hoofdletter,
+  type Rapportregel,
+} from "./import/rapport";
 import { DocumentOpslag } from "./opslag";
 import {
   GEHEUGENGRENS,
@@ -29,7 +34,6 @@ import {
   type Toon,
 } from "./meldingenWinkel";
 import { controleerPakket } from "./pakketcontrole";
-import type { Rapport } from "./import/rapport";
 
 type Serialiseer = () => Promise<Uint8Array>;
 
@@ -151,21 +155,36 @@ export function useTabbladen(opties: Opties) {
     if (nieuwTabblad && document.rapport)
       voegMeldingToe(rapportMelding(id, document.rapport, document.naam));
     if (nieuwTabblad && !document.rapport && document.bytes) {
-      const controle = controleerPakket(document.bytes, document.soort);
-      if (controle.risicos.length) {
-        const regels: Rapport[] = [];
-        for (const risico of controle.risicos) {
+      // Zonder vooraf bijgevoegd rapport (slepen en neerzetten, omzetting):
+      // zelf de pakketcontrole doen, zodat de melding over beperkte
+      // ondersteuning ook op deze openroute verschijnt.
+      try {
+        const regels: Rapportregel[] = [];
+        const namen: string[] = [];
+        for (const risico of controleerPakket(document.bytes, document.soort)
+          .risicos) {
           const gevolg = bijOpenen(risico, document.soort);
-          if (gevolg)
-            regels.push({ onderdeel: hoofdletter(risico), gevolg });
+          if (!gevolg) continue;
+          regels.push({ onderdeel: hoofdletter(risiconaam(risico)), gevolg });
+          namen.push(risiconaam(risico));
         }
         if (regels.length) {
-          const items = regels.map((r) => r.onderdeel).join(", ");
-          const kop = items.length
-            ? i18next.t("report.head.partial", { items })
-            : i18next.t("shell:tabs.memoryWarning");
-          voegMeldingToe({ tabblad: id, toon: "waarschuwing", tekst: kop, rapport: { rapport: { moment: "openen", kop, regels }, bestandsnaam: document.naam } });
+          const kop = i18next.t("import:report.head.partial", {
+            items: namen.join(", "),
+          });
+          voegMeldingToe({
+            tabblad: id,
+            toon: "waarschuwing",
+            tekst: kop,
+            rapport: {
+              rapport: { moment: "openen", kop, regels },
+              bestandsnaam: document.naam,
+            },
+          });
         }
+      } catch {
+        // Geen leesbaar OOXML-pakket: dan valt er ook niets te melden.
+        // Openen gaat gewoon door; de editor of de import meldt de fout zelf.
       }
     }
     if (!opslagen.current.has(id)) {
