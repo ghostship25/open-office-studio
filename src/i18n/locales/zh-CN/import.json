@@ -140,6 +140,7 @@
       "protection": "写保护、文档保护或工作簿保护"
     },
     "parts": {
+      "strictOoxml": "严格 OOXML",
       "conversion": "转换",
       "macros": "VBA 宏",
       "passwordProtection": "密码保护",
@@ -167,6 +168,7 @@
       "pptx": "演示文稿编辑器"
     },
     "open": {
+      "strictOoxml": "此文件使用 OOXML 的严格（Strict）变体（ISO/IEC 29500）。应用以过渡（Transitional）形式编辑，保存时会写成过渡形式。",
       "keptSpreadsheet": "电子表格在保存时的保留情况尚未经过测量；请保留原始文件。",
       "kept": "另存为 .{{format}} 时会保留这些内容。",
       "embeddedObjects": "仅显示为预览图像，无法在此编辑。{{kept}}",

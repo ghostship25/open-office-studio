@@ -141,6 +141,7 @@
       "protection": "Schreib-, Dokument- oder Arbeitsmappenschutz"
     },
     "parts": {
+      "strictOoxml": "Strict-OOXML",
       "conversion": "Konvertierung",
       "macros": "VBA-Makros",
       "passwordProtection": "Kennwortschutz",
@@ -168,6 +169,7 @@
       "pptx": "die Präsentation"
     },
     "open": {
+      "strictOoxml": "Diese Datei verwendet die Strict-Variante von OOXML (ISO/IEC 29500). Die App bearbeitet sie als Transitional; beim Speichern wird Transitional geschrieben.",
       "keptSpreadsheet": "Die Erhaltung beim Speichern wurde für Tabellen noch nicht gemessen; bewahren Sie das Original auf.",
       "kept": "Sie bleiben beim Speichern als .{{format}} erhalten.",
       "embeddedObjects": "Nur als Vorschaubild angezeigt und hier nicht bearbeitbar. {{kept}}",

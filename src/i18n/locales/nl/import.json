@@ -141,6 +141,7 @@
       "protection": "schrijf-, document- of werkmapbeveiliging"
     },
     "parts": {
+      "strictOoxml": "Strict OOXML",
       "conversion": "Omzetting",
       "macros": "VBA-macro’s",
       "passwordProtection": "Wachtwoordbeveiliging",
@@ -168,6 +169,7 @@
       "pptx": "de presentatie-editor"
     },
     "open": {
+      "strictOoxml": "Dit bestand gebruikt de Strict-variant van OOXML (ISO/IEC 29500). De app bewerkt het als Transitional; bij opslaan wordt het Transitional.",
       "keptSpreadsheet": "Behoud bij opslaan is voor rekenbladen nog niet gemeten; bewaar het origineel.",
       "kept": "Ze blijven bij opslaan als .{{format}} behouden.",
       "embeddedObjects": "Worden alleen als voorbeeldafbeelding getoond en kunnen hier niet worden bewerkt. {{kept}}",

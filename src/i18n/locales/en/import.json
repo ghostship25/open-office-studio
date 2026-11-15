@@ -141,6 +141,7 @@
       "protection": "write, document or workbook protection"
     },
     "parts": {
+      "strictOoxml": "Strict OOXML",
       "conversion": "Conversion",
       "macros": "VBA macros",
       "passwordProtection": "Password protection",
@@ -168,6 +169,7 @@
       "pptx": "the presentation editor"
     },
     "open": {
+      "strictOoxml": "This file uses the Strict variant of OOXML (ISO/IEC 29500). The app edits it as Transitional; saving writes Transitional.",
       "keptSpreadsheet": "Preservation on saving has not yet been measured for spreadsheets; keep the original.",
       "kept": "They are preserved when saving as .{{format}}.",
       "embeddedObjects": "Shown only as a preview image and cannot be edited here. {{kept}}",

@@ -124,6 +124,8 @@ export interface OpenKenmerken {
   soort: Soort;
   risicos: readonly Risico[];
   macros?: boolean;
+  /** Werkboek in de ISO-Strict-variant; de app bewerkt het als Transitional. */
+  strict?: boolean;
   /**
    * `engine`: eigen formaat rechtstreeks in de editor; `conversie`: via de
    * kantoorruntime omgezet; `import`: door de app zelf omgezet (tekst, CSV).
@@ -163,6 +165,12 @@ export function openRapport(kenmerken: OpenKenmerken): Rapport | null {
         regels.push({ onderdeel: hoofdletter(risiconaam(risico)), gevolg });
     }
   }
+  if (kenmerken.strict)
+    regels.push({
+      id: STRICT_ID,
+      onderdeel: t("report.parts.strictOoxml"),
+      gevolg: t("report.open.strictOoxml"),
+    });
   regels.push(...(kenmerken.extra ?? []));
   if (kenmerken.macros && !regels.some((r) => r.id === MACRO_ID))
     regels.push({
@@ -197,10 +205,21 @@ export function openRapport(kenmerken: OpenKenmerken): Rapport | null {
 export const MACRO_ID = "macros";
 /** Vaste id van de regel over een omzetting via de kantoorruntime. */
 const OMZETTING_ID = "omzetting";
+/** Vaste id van de regel over een ISO-Strict-werkboek. */
+const STRICT_ID = "strict";
 
 /** "VBA-macro’s" in de interfacetaal. */
 export function macronaam() {
   return t("report.parts.macros");
+}
+
+/** Regel over het datumsysteem 1904 van een werkboek (alleen ter informatie). */
+export function datum1904Regel(): Rapportregel {
+  return {
+    onderdeel: t("report.parts.dateSystem1904"),
+    gevolg: t("sources.dateSystem1904"),
+    info: true,
+  };
 }
 
 /** Binaire Office 97–2003-uitvoerformaten. */

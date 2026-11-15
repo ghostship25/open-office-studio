@@ -21,7 +21,13 @@ import {
 } from "./csvimport";
 import type { Rapportregel } from "./rapport";
 import { controleerPakket } from "../pakketcontrole";
-import { MACRO_ID, macronaam, openRapport, type Rapport } from "./rapport";
+import {
+  datum1904Regel,
+  MACRO_ID,
+  macronaam,
+  openRapport,
+  type Rapport,
+} from "./rapport";
 import { MACRO_INVOER, MACROFORMAAT, scheidMacros } from "./macros";
 import type { Bronkenmerken } from "./bron";
 import {
@@ -128,7 +134,7 @@ async function bereidOnversleuteld(
 
   if (ext === soort) {
     const controle = controleerPakket(bytes, soort);
-    if (controle.datum1904) bronregels = [...bronregels, datum1904()];
+    if (controle.datum1904) bronregels = [...bronregels, datum1904Regel()];
     if (!controle.strict)
       return {
         soort,
@@ -315,16 +321,18 @@ async function bereidOnversleuteld(
     if (!soort) throw new Error(i18next.t("import:errors.unknownModule"));
     let risicos: ReturnType<typeof controleerPakket>["risicos"] = [];
     let macros = false;
+    let strict = false;
     try {
       const controle = controleerPakket(bytes, soort);
       risicos = controle.risicos;
       macros = controle.macros;
+      strict = controle.strict;
     } catch {
       // Geen OOXML-pakket: niets te meten vóór de omzetting.
     }
     const omgezet = await hulp.converteer(bytes, ext, soort, soort);
     if (controleerPakket(omgezet, soort).datum1904)
-      bronregels = [...bronregels, datum1904()];
+      bronregels = [...bronregels, datum1904Regel()];
     return {
       soort,
       naam: metExtensie(naam, soort),
@@ -334,6 +342,7 @@ async function bereidOnversleuteld(
         soort,
         risicos,
         macros,
+        strict,
         route: "conversie",
         bronformaat: ext,
         extra: bronregels,
@@ -360,9 +369,3 @@ export const OUD_BINAIR = new Set([
   "pot",
 ]);
 
-/** Regel over het datumsysteem 1904, in de interfacetaal van dit moment. */
-const datum1904 = (): Rapportregel => ({
-  onderdeel: i18next.t("import:report.parts.dateSystem1904"),
-  gevolg: i18next.t("import:sources.dateSystem1904"),
-  info: true,
-});

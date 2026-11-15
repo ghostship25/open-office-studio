@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { strToU8, zipSync } from "fflate";
 import { uitvoerformaat } from "../formaten";
 import { controleerPakket } from "../pakketcontrole";
-import { openRapport, opslagRapport, rapportTekst } from "./rapport";
+import { datum1904Regel, openRapport, opslagRapport, rapportTekst } from "./rapport";
 import { bereidOpenen } from "./openen";
 
 const formaat = (soort: "docx" | "xlsx" | "pptx", ext: string) =>
@@ -37,6 +37,25 @@ describe("Rapport bij openen", () => {
     // Revisies worden gewoon ondersteund en horen niet in het rapport.
     expect(rapport.kop).not.toContain("revisies");
     expect(rapport.regels[2].gevolg).toContain("nooit uitgevoerd");
+  });
+  it("meldt een ISO-Strict-werkboek en het datumsysteem 1904", () => {
+    const rapport = openRapport({
+      soort: "xlsx",
+      risicos: [],
+      strict: true,
+      route: "engine",
+      bronformaat: "xlsx",
+      extra: [datum1904Regel()],
+    })!;
+    expect(rapport.moment).toBe("openen");
+    expect(rapport.regels.map((r) => r.onderdeel)).toEqual([
+      "Strict OOXML",
+      "Datumsysteem 1904",
+    ]);
+    // De kop begint met een kleine letter, zoals bij de andere risico’s.
+    expect(rapport.kop).toContain("strict OOXML");
+    // Het datumsysteem is een toelichting, geen bezwaar in de kopregel.
+    expect(rapport.kop).not.toContain("1904");
   });
   it("is eerlijk over ongemeten behoud in rekenbladen", () => {
     const rapport = openRapport({

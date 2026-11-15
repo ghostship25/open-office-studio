@@ -142,6 +142,7 @@
       "protection": "protection en écriture, du document ou du classeur"
     },
     "parts": {
+      "strictOoxml": "OOXML Strict",
       "conversion": "Conversion",
       "macros": "Macros VBA",
       "passwordProtection": "Protection par mot de passe",
@@ -169,6 +170,7 @@
       "pptx": "l'éditeur de présentations"
     },
     "open": {
+      "strictOoxml": "Ce fichier utilise la variante Strict d’OOXML (ISO/CEI 29500). L’application le modifie en Transitional ; l’enregistrement produit du Transitional.",
       "keptSpreadsheet": "La conservation à l'enregistrement n'a pas encore été mesurée pour les classeurs ; conservez l'original.",
       "kept": "Ils sont conservés lors de l'enregistrement au format .{{format}}.",
       "embeddedObjects": "Affichés uniquement sous forme d'image d'aperçu et non modifiables ici. {{kept}}",

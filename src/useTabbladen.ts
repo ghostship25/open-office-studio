@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import i18next from "./i18n/config";
-import { openRapport } from "./import/rapport";
+import { datum1904Regel, openRapport } from "./import/rapport";
 import { DocumentOpslag } from "./opslag";
 import {
   GEHEUGENGRENS,
@@ -160,9 +160,11 @@ export function useTabbladen(opties: Opties) {
           soort: document.soort,
           risicos: controle.risicos,
           macros: controle.macros,
+          strict: controle.strict,
           route: "engine",
           bronformaat:
             document.naam.split(".").pop()?.toLowerCase() || document.soort,
+          extra: controle.datum1904 ? [datum1904Regel()] : [],
         });
         if (rapport)
           voegMeldingToe(rapportMelding(id, rapport, document.naam));
