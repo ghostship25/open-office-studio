@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { useTabbladen } from "./useTabbladen";
 import {
   browserOpslag,
+  bruikbareKopieen,
   desktopOpslag,
   herstelInterval,
   kopieNodig,
@@ -63,7 +64,7 @@ export function useHerstel({ tabs, bezig, opslaanAls }: Opties) {
     let actief = true;
     void gestart
       .then(() => (documentvenster ? [] : opslag.wezen()))
-      .then((items) => actief && setAanbod(items))
+      .then((items) => actief && setAanbod(bruikbareKopieen(items)))
       .catch(() => undefined);
     return () => {
       actief = false;

@@ -34,6 +34,14 @@ export interface HerstelOpslag {
   lees(item: HerstelItem): Promise<Uint8Array>;
 }
 
+/**
+ * Een kopie zonder inhoud levert geen document op. Zo'n rij hoort niet in het
+ * herstelvenster: er valt niets te herstellen en het venster houdt de rest van
+ * de app onnodig van het toetsenbord af.
+ */
+export const bruikbareKopieen = (items: HerstelItem[]) =>
+  items.filter((item) => item.grootte > 0);
+
 export const STANDAARD_INTERVAL_MINUTEN = 5;
 /** Instelbaar interval in minuten (1–60), bijv. vanuit een instellingenvenster. */
 export const INTERVAL_SLEUTEL = "openaec-office-herstelinterval";

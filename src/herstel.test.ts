@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   HARTSLAG_GRENS,
   beoordeelSessies,
+  bruikbareKopieen,
   herstelInterval,
   kopieNodig,
   nieuweSessie,
+  type HerstelItem,
 } from "./herstel";
 
 describe("automatisch herstel", () => {
@@ -41,6 +43,25 @@ describe("automatisch herstel", () => {
     );
     expect([...aanbieden].sort()).toEqual(["crash", "geen-slag"]);
     expect([...opruimen]).toEqual(["netjes"]);
+  });
+
+  it("biedt geen lege herstelkopieën aan", () => {
+    const kopie = (grootte: number, sleutel: string): HerstelItem => ({
+      sessie: "s1",
+      sleutel,
+      naam: `${sleutel}.xlsx`,
+      soort: "xlsx",
+      exportFormaat: "xlsx",
+      datum: 1,
+      grootte,
+    });
+    expect(bruikbareKopieen([])).toEqual([]);
+    expect(bruikbareKopieen([kopie(0, "a"), kopie(0, "b")])).toEqual([]);
+    expect(
+      bruikbareKopieen([kopie(0, "a"), kopie(12, "b")]).map(
+        (item) => item.sleutel,
+      ),
+    ).toEqual(["b"]);
   });
 
   it("sessienamen voldoen aan de regels van Rust", () => {
