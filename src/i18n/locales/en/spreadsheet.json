@@ -21,7 +21,13 @@
     "fullCalcOnLoad": "The file asks for a full recalculation on opening (fullCalcOnLoad); the saved results may be out of date.",
     "calcChain": "The calculation chain (calcChain) is not kept when saving; Excel rebuilds it.",
     "tooLarge": "The spreadsheet is too large to check.",
-    "invalidWorkbook": "Not a valid XLSX workbook."
+    "invalidWorkbook": "Not a valid XLSX workbook.",
+    "limitedCalculation_one": "The calculation engine ran out of budget while recalculating {{count}} formula; it keeps its saved result and may be out of date.",
+    "limitedCalculation_other": "The calculation engine ran out of budget while recalculating {{count}} formulas; they keep their saved results and may be out of date.",
+    "limitedTruncated": "The list of cells that were not recalculated stops at 10,000 cells."
+  },
+  "sizeLimit": {
+    "tooLarge": "This spreadsheet is {{size}} and the app opens workbooks up to {{limit}}. Nothing was opened; split the file or remove unused sheets."
   },
   "print": {
     "pageLabel": "{{sheet}}, page {{page}} of {{pages}}",

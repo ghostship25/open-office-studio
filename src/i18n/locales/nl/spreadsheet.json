@@ -21,7 +21,13 @@
     "fullCalcOnLoad": "Het bestand vraagt om volledige herberekening bij openen (fullCalcOnLoad); de opgeslagen uitkomsten zijn mogelijk verouderd.",
     "calcChain": "De rekenvolgorde (calcChain) wordt bij opslaan niet bewaard; Excel bouwt die opnieuw op.",
     "tooLarge": "Rekenblad is te groot voor de controle.",
-    "invalidWorkbook": "Geen geldig XLSX-werkboek."
+    "invalidWorkbook": "Geen geldig XLSX-werkboek.",
+    "limitedCalculation_one": "De rekenkern stopte na het budget met de herberekening van {{count}} formule; die houdt de opgeslagen uitkomst en kan verouderd zijn.",
+    "limitedCalculation_other": "De rekenkern stopte na het budget met de herberekening van {{count}} formules; die houden de opgeslagen uitkomst en kunnen verouderd zijn.",
+    "limitedTruncated": "De lijst met niet-herberekende cellen is bij 10.000 cellen afgekapt."
+  },
+  "sizeLimit": {
+    "tooLarge": "Dit rekenblad is {{size}} groot en de app opent rekenbladen tot {{limit}}. Er is niets geopend; splits het bestand of verwijder ongebruikte bladen."
   },
   "print": {
     "pageLabel": "{{sheet}}, pagina {{page}} van {{pages}}",

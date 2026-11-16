@@ -34,6 +34,11 @@ import { bereidVoorwaardelijkeWeergave } from "./rekenblad/voorwaardelijke-weerg
 import { bereidBladEigenschappen } from "./rekenblad/bladEigenschappen";
 import { bereidGroepen } from "./rekenblad/groepsbediening";
 import { metBeginregio } from "./rekenblad/werkmapregio";
+import {
+  beoordeelRekenbladGrootte,
+  meldingTeGroot,
+  type RekenbladGrootte,
+} from "./rekenblad/grootte";
 import { intlLocale } from "./i18n/config";
 import { useHerladen } from "./grafieken/ui/herladen";
 import { laadFiltersUitBestand, maakRekenbladLaag } from "./lint/rekenblad-laag";
@@ -73,6 +78,28 @@ configureDefaultFonts({
 void laadSysteemLettertypen();
 // "Source Serif 4" e.d. alleen geldig tussen aanhalingstekens op het canvas.
 installeerFontCitering();
+/** Weigert een werkboek dat boven de opengrens valt, met een concrete melding (#74). */
+function TeGrootRekenblad({
+  grootte,
+  fout,
+}: {
+  grootte: RekenbladGrootte;
+  fout: (fout: Error) => void;
+}) {
+  const melding = meldingTeGroot(grootte);
+  const gemeld = useRef(false);
+  useEffect(() => {
+    if (gemeld.current) return;
+    gemeld.current = true;
+    fout(new Error(melding));
+  }, [melding, fout]);
+  return (
+    <p className="office-loading" role="alert">
+      {melding}
+    </p>
+  );
+}
+
 export type Soort = "docx" | "xlsx" | "pptx";
 export interface EditorProps {
   soort: Soort;
@@ -193,6 +220,9 @@ export default function OfficeEditor(props: EditorProps) {
       : herladen.bytes,
     [herladen.bytes, props.soort],
   );
+  // Te grote werkboeken weigert de app vóór de editor laadt (#74).
+  const rekenbladGrootte =
+    props.soort === "xlsx" ? beoordeelRekenbladGrootte(herladen.bytes) : null;
   // Spellingcontrole en autocorrectie (#21): golflijnen, menu, F7, statusbalk.
   const spelling = useTekstSpelling(
     () => docx.current,
@@ -366,12 +396,14 @@ export default function OfficeEditor(props: EditorProps) {
             inventariseerRekenblad,
             vergelijkCache,
             leesUitWerkboek,
+            leesRekenstatus,
             rekenbladMelding,
           }) => {
             const controle = inventariseerRekenblad(recent.current.bytes);
             const melding = rekenbladMelding(
               controle,
               vergelijkCache(controle, leesUitWerkboek(api.handle, controle)),
+              leesRekenstatus(api.handle),
             );
             if (melding?.ernst === "waarschuwing")
               meldEditor(
@@ -487,6 +519,8 @@ export default function OfficeEditor(props: EditorProps) {
         </EditorApi.Provider>
       </RibbonFout.Provider>
     );
+  if (props.soort === "xlsx" && rekenbladGrootte?.teGroot)
+    return <TeGrootRekenblad grootte={rekenbladGrootte} fout={props.fout} />;
   if (props.soort === "xlsx")
     return (
       <RibbonFout.Provider value={(bericht) => props.fout(new Error(bericht))}>

@@ -90,6 +90,33 @@ export interface RekenbladMelding {
   regels: string[];
 }
 
+/** Wat de laatste herberekening van de rekenkern zelf niet afmaakte. */
+export interface Rekenstatus {
+  /** Cellen waarvan de herberekening het budget van de kern niet haalde. */
+  beperkt: number;
+  /** Cellen in een kringverwijzing volgens de laatste berekening. */
+  kring: number;
+  /** De kern stopte een van beide lijsten bij 10.000 cellen. */
+  afgekapt: boolean;
+}
+
+/**
+ * Leest het berekeningsoordeel van de kern zonder celwaarden opnieuw te lezen:
+ * de catalogusaanvraag (`readCells` zonder bereiken) bevat het.
+ */
+export function leesRekenstatus(
+  handle: Pick<WorkbookHandle, "readCells">,
+): Rekenstatus {
+  const catalogus = handle.readCells({ ranges: [] });
+  if (!catalogus.ok) return { beperkt: 0, kring: 0, afgekapt: false };
+  const berekening = catalogus.calculation;
+  return {
+    beperkt: berekening?.limitedCells?.length ?? 0,
+    kring: berekening?.cycleCells?.length ?? 0,
+    afgekapt: berekening?.truncated === true,
+  };
+}
+
 const ENTITEITEN: Record<string, string> = {
   amp: "&",
   lt: "<",
@@ -357,9 +384,15 @@ function cellenTekst(aantal: number) {
 export function rekenbladMelding(
   controle: RekenbladControle,
   afwijkend: string[] = [],
+  status?: Rekenstatus,
 ): RekenbladMelding | null {
   const regels: string[] = [];
   let waarschuwing = false;
+  if (status && status.beperkt > 0) {
+    waarschuwing = true;
+    regels.push(t("limitedCalculation", { count: status.beperkt }));
+  }
+  if (status?.afgekapt) regels.push(t("limitedTruncated"));
   const onbekend = Object.entries(controle.onbekendeFuncties);
   if (onbekend.length) {
     waarschuwing = true;
