@@ -6,7 +6,7 @@
  * Node, zonder i18n-opzet): dan de Nederlandse brontekst uit het JSON-bestand.
  */
 import i18next from "i18next";
-import nl from "../../i18n/locales/nl/writer.json" with { type: "json" };
+import nl from "../../i18n/locales/nl/writer.json";
 
 type Waarden = Record<string, string | number>;
 
