@@ -51,6 +51,31 @@ export function detecteerCodering(b: Uint8Array, afgeknipt = false): Codering {
   return isGeldigeUtf8(b, afgeknipt) ? "utf-8" : "windows-1252";
 }
 
+/**
+ * De tekens van Windows-1252 op 0x80–0x9F; de overige bytes zijn gelijk aan
+ * Latin-1. Nodig omdat `TextDecoder("windows-1252")` op sommige platforms
+ * (onder meer Node op Windows) de Latin-1-tabel gebruikt en van 0x80 dus
+ * U+0080 maakt in plaats van het euroteken.
+ */
+const CP1252_HOGER =
+  "\u20ac\u0081\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u008d\u017d\u008f\u0090\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u009d\u017e\u0178";
+
+/** Decodeert bytes als Windows-1252 (Latin-1 met 0x80–0x9F ingevuld). */
+export function decodeerWindows1252(b: Uint8Array): string {
+  let tekst = "";
+  for (let begin = 0; begin < b.length; begin += 0x8000) {
+    const eind = Math.min(begin + 0x8000, b.length);
+    const codes = new Array<number>(eind - begin);
+    for (let i = begin; i < eind; i++) {
+      const c = b[i];
+      codes[i - begin] =
+        c >= 0x80 && c <= 0x9f ? CP1252_HOGER.charCodeAt(c - 0x80) : c;
+    }
+    tekst += String.fromCharCode(...codes);
+  }
+  return tekst;
+}
+
 export interface GedecodeerdeTekst {
   tekst: string;
   codering: Codering;
@@ -67,9 +92,13 @@ export function decodeerTekst(b: Uint8Array, maxBytes = Infinity): GedecodeerdeT
   let deel = afgekapt ? b.subarray(0, maxBytes) : b;
   const codering = detecteerCodering(deel, afgekapt);
   if (codering.startsWith("utf-16") && deel.length % 2 === 1) deel = deel.subarray(0, deel.length - 1);
-  const label = codering === "utf-8-bom" ? "utf-8" : codering;
   // TextDecoder verwijdert de BOM zelf (ignoreBOM = false).
-  let tekst = new TextDecoder(label).decode(deel);
+  let tekst =
+    codering === "windows-1252"
+      ? decodeerWindows1252(deel)
+      : new TextDecoder(codering === "utf-8-bom" ? "utf-8" : codering).decode(
+          deel,
+        );
   // Een afgeknipt UTF-8-teken aan het einde levert U+FFFD op; weghalen.
   if (afgekapt) tekst = tekst.replace(/\uFFFD$/, "");
   return { tekst, codering, afgekapt };
