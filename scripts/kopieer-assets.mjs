@@ -33,10 +33,12 @@ await cp(
   "public/licenses/fonts-cjk/LICENSES",
   { recursive: true },
 );
-// Extra open lettertypen (assets/lettertypen.json): uit de cache, anders downloaden.
+// Extra open lettertypen (assets/lettertypen.json): uit de cache, anders
+// downloaden. Zonder (werkend) netwerk gaat de bouw door met de meegeleverde
+// lettertypen; `node scripts/haal-lettertypen.mjs` stopt zelf wel met een fout,
+// zodat CI een onvolledige set opmerkt.
 {
   const { haalLettertypen, CACHE } = await import("./haal-lettertypen.mjs");
-  const dev = process.env.npm_lifecycle_event === "predev";
   const offline = process.env.OOS_LETTERTYPEN_OFFLINE === "1";
   let resultaat;
   try {
@@ -45,16 +47,17 @@ await cp(
     resultaat = { ontbrekend: [String(e?.message ?? e)] };
   }
   if (resultaat.ontbrekend.length) {
-    const uitleg = `Extra lettertypen ontbreken (${resultaat.ontbrekend.length}; eerste: ${resultaat.ontbrekend[0]}). Vul de cache ${CACHE} met "node scripts/haal-lettertypen.mjs" (netwerk naar github.com nodig) of zet een bewaarde cache terug.`;
-    if (!dev) throw new Error(uitleg);
-    console.warn(`Waarschuwing: ${uitleg} De app gebruikt nu alleen de meegeleverde lettertypen.`);
+    console.warn(
+      `Waarschuwing: extra lettertypen ontbreken (${resultaat.ontbrekend.length}; eerste: ${resultaat.ontbrekend[0]}). De app gebruikt nu alleen de meegeleverde lettertypen. Vul de cache ${CACHE} met "node scripts/haal-lettertypen.mjs" (netwerk naar github.com nodig) of zet een bewaarde cache terug.`,
+    );
   }
 }
-// Spellingcontrole (#21): woordenboeken uit de cache of downloaden, en de WASM-module.
+// Spellingcontrole (#21): woordenboeken uit de cache of downloaden, en de
+// WASM-module. Ontbreekt een van beide, dan gaat de bouw door zonder
+// spellingcontrole in plaats van te stoppen.
 {
   const { haalWoordenboeken, CACHE } = await import("./haal-woordenboeken.mjs");
   const { bouwSpellingWasm } = await import("./bouw-spelling-wasm.mjs");
-  const dev = process.env.npm_lifecycle_event === "predev";
   const problemen = [];
   try {
     const { ontbrekend } = await haalWoordenboeken({
@@ -71,8 +74,9 @@ await cp(
     problemen.push(String(e?.message ?? e));
   }
   if (problemen.length) {
-    if (!dev) throw new Error(problemen.join(" "));
-    console.warn(`Waarschuwing: ${problemen.join(" ")} De spellingcontrole is dan niet beschikbaar.`);
+    console.warn(
+      `Waarschuwing: ${problemen.join(" ")} De spellingcontrole is dan niet beschikbaar.`,
+    );
   }
 }
 await import("./kopieer-licenties.mjs");

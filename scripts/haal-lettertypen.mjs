@@ -7,8 +7,9 @@
  * public/fonts/extra/. Licentieteksten gaan naar public/licenses/fonts-extra/.
  *
  * Met een gevulde cache is geen netwerk nodig. Ontbreekt de cache en is er geen
- * netwerk, dan stopt een build met een duidelijke fout; `pnpm dev` waarschuwt
- * alleen (de app valt dan terug op de meegeleverde lettertypen).
+ * netwerk, dan waarschuwt `pnpm dev` én `pnpm build` en gaat de bouw door (de app
+ * valt dan terug op de meegeleverde lettertypen); dit script zelf stopt met een
+ * fout, zodat CI een onvolledige set opmerkt.
  *
  * Gebruik:
  *   node scripts/haal-lettertypen.mjs            downloaden wat ontbreekt en kopiëren
@@ -16,11 +17,11 @@
  *   node scripts/haal-lettertypen.mjs --controleer  alleen de cache controleren
  * Omgeving: OOS_LETTERTYPEN_OFFLINE=1 verbiedt netwerk (zoals --offline).
  */
-import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { unzipSync } from "fflate";
+import { netwerkbron, sha256, uitCache } from "./bestandscache.mjs";
 
 export const MANIFEST = "assets/lettertypen.json";
 export const CACHE = ".local/lettertypen-cache";
@@ -28,10 +29,7 @@ export const DOEL = "public/fonts/extra";
 export const LICENTIES = "public/licenses/fonts-extra";
 /** Alleen deze licenties zijn toegestaan. */
 export const TOEGESTAAN = new Set(["OFL-1.1", "Apache-2.0"]);
-/** Netwerk alleen naar GitHub (repositories en releases). */
-const TOEGESTANE_HOSTS = new Set(["raw.githubusercontent.com", "github.com"]);
 
-const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 export const slug = (familie) => familie.replace(/\s+/g, "");
 
 export async function leesManifest(pad = MANIFEST) {
@@ -48,32 +46,6 @@ export async function leesManifest(pad = MANIFEST) {
   return manifest;
 }
 
-async function download(url) {
-  const host = new URL(url).hostname;
-  if (!TOEGESTANE_HOSTS.has(host)) throw new Error(`Bron buiten GitHub geweigerd: ${url}`);
-  let laatste;
-  for (let poging = 0; poging < 3; poging++) {
-    try {
-      const antwoord = await fetch(url, { redirect: "follow" });
-      if (antwoord.ok) return new Uint8Array(await antwoord.arrayBuffer());
-      laatste = new Error(`HTTP ${antwoord.status} voor ${url}`);
-      if (antwoord.status === 404) break;
-    } catch (e) {
-      laatste = e;
-    }
-  }
-  throw laatste;
-}
-
-async function uitCache(pad, hash) {
-  try {
-    const data = await readFile(pad);
-    return sha256(data) === hash ? data : null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Vult de cache (zo nodig met netwerk) en kopieert naar public/.
  * Geeft { ontbrekend, gedownload, bytes } terug; gooit alleen bij een
@@ -86,16 +58,19 @@ export async function haalLettertypen({ netwerk = true, kopieer = true, log = co
   const ontbrekend = [];
   let gedownload = 0;
   let bytes = 0;
+  const bron = netwerkbron(netwerk);
 
   async function archief(url, hash) {
     if (!archieven.has(url)) {
       const pad = join(CACHE, "archieven", `${hash}.zip`);
       let data = await uitCache(pad, hash);
-      if (!data && netwerk) {
-        data = await download(url);
-        if (sha256(data) !== hash) throw new Error(`Hash klopt niet voor ${url}`);
-        await mkdir(join(CACHE, "archieven"), { recursive: true });
-        await writeFile(pad, data);
+      if (!data) {
+        data = await bron.haal(url);
+        if (data) {
+          if (sha256(data) !== hash) throw new Error(`Hash klopt niet voor ${url}`);
+          await mkdir(join(CACHE, "archieven"), { recursive: true });
+          await writeFile(pad, data);
+        }
       }
       archieven.set(url, data ? unzipSync(new Uint8Array(data)) : null);
     }
@@ -105,22 +80,23 @@ export async function haalLettertypen({ netwerk = true, kopieer = true, log = co
   for (const familie of manifest.families) {
     const licPad = join(CACHE, "licenties", `${slug(familie.familie)}.txt`);
     if (!(await uitCache(licPad, familie.licentiebestand.sha256))) {
-      if (netwerk) {
-        const data = await download(familie.licentiebestand.url);
+      const data = await bron.haal(familie.licentiebestand.url);
+      if (!data) ontbrekend.push(`${familie.familie}: licentie`);
+      else {
         if (sha256(data) !== familie.licentiebestand.sha256)
           throw new Error(`Hash van de licentie klopt niet: ${familie.familie} (${familie.licentiebestand.url})`);
         await writeFile(licPad, data);
         gedownload++;
-      } else ontbrekend.push(`${familie.familie}: licentie`);
+      }
     }
     for (const b of familie.bestanden) {
       const pad = join(CACHE, b.bestand);
       let data = await uitCache(pad, b.sha256);
-      if (!data && netwerk) {
+      if (!data) {
         if (b.archief) {
           const inhoud = await archief(b.url, b.archiefSha256);
           data = inhoud?.[b.archief] ?? null;
-        } else data = await download(b.url);
+        } else data = await bron.haal(b.url);
         if (data && sha256(data) !== b.sha256)
           throw new Error(`Hash klopt niet: ${b.bestand} (${b.url})`);
         if (data) {
@@ -166,7 +142,7 @@ export async function haalLettertypen({ netwerk = true, kopieer = true, log = co
   }
   log?.(
     ontbrekend.length
-      ? `Lettertypen: ${ontbrekend.length} bestand(en) ontbreken in ${CACHE}.`
+      ? `Lettertypen: ${ontbrekend.length} bestand(en) ontbreken in ${CACHE}${bron.fout ? ` (netwerk: ${bron.fout.message})` : ""}.`
       : `Lettertypen: ${manifest.families.length} extra families (${(bytes / 1048576).toFixed(1)} MB)${gedownload ? `, ${gedownload} gedownload` : " uit de cache"}.`,
   );
   return { ontbrekend, gedownload, bytes, families: manifest.families.length };

@@ -12,10 +12,10 @@
  *   node scripts/haal-woordenboeken.mjs --offline  alleen de cache gebruiken
  * Omgeving: OOS_WOORDENBOEKEN_OFFLINE=1 verbiedt netwerk (zoals --offline).
  */
-import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { netwerkbron, sha256, uitCache } from "./bestandscache.mjs";
 
 export const MANIFEST = "assets/woordenboeken.json";
 export const CACHE = ".local/woordenboeken-cache";
@@ -23,9 +23,7 @@ export const DOEL = "public/woordenboeken";
 export const LICENTIES = "public/licenses/woordenboeken";
 /** Alleen deze (SPDX-)licenties zijn toegestaan. */
 export const TOEGESTAAN = new Set(["BSD-3-Clause OR CC-BY-3.0", "MIT AND BSD"]);
-const TOEGESTANE_HOSTS = new Set(["raw.githubusercontent.com", "github.com"]);
 
-const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 const geldigeHash = (h) => /^[0-9a-f]{64}$/.test(h ?? "");
 
 export async function leesManifest(pad = MANIFEST) {
@@ -41,31 +39,6 @@ export async function leesManifest(pad = MANIFEST) {
   return manifest;
 }
 
-async function download(url) {
-  if (!TOEGESTANE_HOSTS.has(new URL(url).hostname)) throw new Error(`Bron buiten GitHub geweigerd: ${url}`);
-  let laatste;
-  for (let poging = 0; poging < 3; poging++) {
-    try {
-      const antwoord = await fetch(url, { redirect: "follow" });
-      if (antwoord.ok) return new Uint8Array(await antwoord.arrayBuffer());
-      laatste = new Error(`HTTP ${antwoord.status} voor ${url}`);
-      if (antwoord.status === 404) break;
-    } catch (e) {
-      laatste = e;
-    }
-  }
-  throw laatste;
-}
-
-async function uitCache(pad, hash) {
-  try {
-    const data = await readFile(pad);
-    return sha256(data) === hash ? data : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Cachebestand per hash: twee woordenboeken met hetzelfde .aff delen het. */
 const cachePad = (hash) => join(CACHE, hash);
 
@@ -79,15 +52,18 @@ export async function haalWoordenboeken({ netwerk = true, kopieer = true, log = 
   const ontbrekend = [];
   let gedownload = 0;
   let bytes = 0;
+  const bron = netwerkbron(netwerk);
   for (const w of manifest.woordenboeken)
     for (const deel of ["licentiebestand", "aff", "dic"]) {
       const { url, sha256: hash } = w[deel];
       let data = await uitCache(cachePad(hash), hash);
-      if (!data && netwerk) {
-        data = await download(url);
-        if (sha256(data) !== hash) throw new Error(`Hash klopt niet: ${w.id} ${deel} (${url})`);
-        await writeFile(cachePad(hash), data);
-        gedownload++;
+      if (!data) {
+        data = await bron.haal(url);
+        if (data) {
+          if (sha256(data) !== hash) throw new Error(`Hash klopt niet: ${w.id} ${deel} (${url})`);
+          await writeFile(cachePad(hash), data);
+          gedownload++;
+        }
       }
       if (!data) ontbrekend.push(`${w.id}: ${deel}`);
       else if (deel !== "licentiebestand") bytes += data.length;
@@ -111,7 +87,7 @@ export async function haalWoordenboeken({ netwerk = true, kopieer = true, log = 
   }
   log(
     ontbrekend.length
-      ? `Woordenboeken: ${ontbrekend.length} bestand(en) ontbreken in ${CACHE}.`
+      ? `Woordenboeken: ${ontbrekend.length} bestand(en) ontbreken in ${CACHE}${bron.fout ? ` (netwerk: ${bron.fout.message})` : ""}.`
       : `Woordenboeken: ${manifest.woordenboeken.length} talen (${(bytes / 1e6).toFixed(1)} MB)${gedownload ? `, ${gedownload} gedownload` : " uit de cache"}.`,
   );
   return { ontbrekend, gedownload, bytes };
