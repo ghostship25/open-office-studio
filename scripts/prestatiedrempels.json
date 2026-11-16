@@ -1,0 +1,15 @@
+{
+  "toelichting": "Bovengrenzen voor de #74-referenties uit scripts/maak-rekenbladprestatie.py, gemeten door scripts/meet-rekenbladkern.mjs. De waarden dekken de al vastgelegde grenzen van het meetproces (60 s openen, 1800 MiB piek) en een expliciete herberekengrens. Het zijn startwaarden: trek ze pas aan op een gemeten CI-basislijn.",
+  "gevallen": {
+    "100k-rijen-30-kolommen": {
+      "openMs": 60000,
+      "tekenMs": 5000,
+      "piekRssMiB": 1800
+    },
+    "50k-afhankelijke-formules": {
+      "openMs": 60000,
+      "herberekenMs": 30000,
+      "piekRssMiB": 1800
+    }
+  }
+}

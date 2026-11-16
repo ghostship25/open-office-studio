@@ -1,0 +1,61 @@
+name: Rekenbladprestaties tegen vaste drempels
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/rekenblad-prestatiecontrole.yml
+      - scripts/controleer-prestatiedrempels.mjs
+      - scripts/prestatiedrempels.json
+      - scripts/maak-rekenbladprestatie.py
+      - scripts/meet-rekenbladkern.mjs
+      - vendor/rekenbladengine/**
+      - patches/rekenbladengine-**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/rekenblad-prestatiecontrole.yml
+      - scripts/controleer-prestatiedrempels.mjs
+      - scripts/prestatiedrempels.json
+      - scripts/maak-rekenbladprestatie.py
+      - scripts/meet-rekenbladkern.mjs
+      - vendor/rekenbladengine/**
+      - patches/rekenbladengine-**
+permissions:
+  contents: read
+jobs:
+  drempels:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Vaste referentiebestanden maken
+        run: python scripts/maak-rekenbladprestatie.py
+      - name: Meten met de meegeleverde rekenkern
+        run: node scripts/meet-rekenbladkern.mjs
+      - name: Drempels controleren
+        run: node scripts/controleer-prestatiedrempels.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rekenbladprestaties-${{ matrix.os }}
+          path: |
+            .local/prestatie/rekenbladen/kern-rapport.json
+            .local/prestatie/rekenbladen/manifest.json
+          include-hidden-files: true

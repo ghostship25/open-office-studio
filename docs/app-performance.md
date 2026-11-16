@@ -46,6 +46,18 @@ De laatste browserproef bevatte 11 native `displayList`-aanroepen tijdens de scr
 
 De laatste CPU4-run had nog een maximaal scrollframe van 417 ms en een selectieframe van 1,15 s. De globale tijden varieerden sterk met de computerbelasting. Het gehalveerde aantal rasterlezingen is een concrete besparing; volledige soepelheid is hiermee nog niet aangetoond.
 
+### Vaste referenties als CI-poort
+
+`scripts/maak-rekenbladprestatie.py` schrijft twee vaste referenties met checksums: 100.000 rijen bij 30 kolommen en 50.000 afhankelijke formules. `scripts/meet-rekenbladkern.mjs` meet die met de meegeleverde rekenkern en schrijft `kern-rapport.json`. `scripts/controleer-prestatiedrempels.mjs` vergelijkt dat rapport met `scripts/prestatiedrempels.json` en faalt op een overschrijding, een ontbrekende meting of een referentie zonder drempel.
+
+De workflow `Rekenbladprestaties tegen vaste drempels` doet dit op Ubuntu en Windows bij wijzigingen aan de drempels, de meetscripts, de referentiegenerator, `vendor/rekenbladengine` en `patches/rekenbladengine-*`, en bewaart rapport en manifest als artifact. De drempels zijn de al vastgelegde grenzen van het meetproces (60 s openen, 1800 MiB piek) plus een expliciete herberekengrens; het zijn startwaarden, geen gemeten snelheidsclaim. Trek ze pas aan op een gemeten CI-basislijn.
+
+```powershell
+python scripts/maak-rekenbladprestatie.py
+node scripts/meet-rekenbladkern.mjs
+node scripts/controleer-prestatiedrempels.mjs
+```
+
 ## Presentation
 
 `DiaTelling` bewaart alleen het aantal dia’s voor de huidige documentversie. Navigatie en DOM-mutaties kunnen dat aantal hergebruiken. Invoegen, verwijderen, Undo/Redo en andere documentwijzigingen laten de teller opnieuw lezen. De statusbalk publiceert gelijke dia-/totaalaantallen niet opnieuw.
