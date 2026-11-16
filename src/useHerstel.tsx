@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { useTabbladen } from "./useTabbladen";
 import {
+  bewaarwaardig,
   browserOpslag,
   bruikbareKopieen,
   desktopOpslag,
@@ -64,7 +65,18 @@ export function useHerstel({ tabs, bezig, opslaanAls }: Opties) {
     let actief = true;
     void gestart
       .then(() => (documentvenster ? [] : opslag.wezen()))
-      .then((items) => actief && setAanbod(bruikbareKopieen(items)))
+      .then((items) => {
+        if (!actief) return;
+        const bruikbaar = bruikbareKopieen(items);
+        // Een lege kopie levert nooit een document op: meteen opruimen, zodat
+        // hij bij de volgende start niet opnieuw in de lijst staat.
+        for (const item of items)
+          if (!bruikbaar.includes(item))
+            void opslag
+              .verwijder(item.sessie, item.sleutel)
+              .catch(() => undefined);
+        setAanbod(bruikbaar);
+      })
       .catch(() => undefined);
     return () => {
       actief = false;
@@ -112,6 +124,8 @@ export function useHerstel({ tabs, bezig, opslaanAls }: Opties) {
                     })
                   ).bytes
                 : inhoud;
+            // Niets te bewaren als de serialisatie leeg bleef.
+            if (!bewaarwaardig(bytes)) continue;
             // Intussen opgeslagen of gesloten: geen kopie meer nodig.
             if (!tabs.isGewijzigd(tabblad)) continue;
             await opslag.bewaar(

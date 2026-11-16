@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   HARTSLAG_GRENS,
   beoordeelSessies,
+  bewaarwaardig,
   bruikbareKopieen,
   herstelInterval,
   kopieNodig,
@@ -62,6 +63,11 @@ describe("automatisch herstel", () => {
         (item) => item.sleutel,
       ),
     ).toEqual(["b"]);
+  });
+
+  it("bewaart geen lege serialisatie als herstelkopie", () => {
+    expect(bewaarwaardig(new Uint8Array(0))).toBe(false);
+    expect(bewaarwaardig(new Uint8Array(1))).toBe(true);
   });
 
   it("sessienamen voldoen aan de regels van Rust", () => {

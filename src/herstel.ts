@@ -42,6 +42,9 @@ export interface HerstelOpslag {
 export const bruikbareKopieen = (items: HerstelItem[]) =>
   items.filter((item) => item.grootte > 0);
 
+/** Een lege serialisatie levert geen herstelbaar document op; zo'n kopie bewaren heeft geen zin. */
+export const bewaarwaardig = (bytes: Uint8Array) => bytes.byteLength > 0;
+
 export const STANDAARD_INTERVAL_MINUTEN = 5;
 /** Instelbaar interval in minuten (1–60), bijv. vanuit een instellingenvenster. */
 export const INTERVAL_SLEUTEL = "openaec-office-herstelinterval";
