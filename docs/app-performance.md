@@ -70,6 +70,10 @@ Twee eisen uit #74 blijven open: 100.000 rijen soepel scrollen en 50.000 formule
 2. De schrijflaag (lint, validatie, tekenobjecten, bladbeheer) naar `applyEdits` met versiecontrole.
 3. Pas daarna `legacySyncApi` laten vallen en de worker-open plus voortgang UI aanzetten.
 
+Stap 1 is begonnen bij de selectiestatistieken. `SelectieStatistieken` neemt nu een leesbron die zowel de synchrone handle als `api.version()`/`api.readCells()` accepteert en elke lezing awaitet; de statusbalk geeft hem de asynchrone editormethoden in plaats van `api.handle`. Het lezen van een selectie van 200.000 cellen hangt daarmee niet langer aan de synchrone handle. De bijbehorende gevallen staan in `src/status/selectiestatistiek.test.ts`.
+
+De koppen en de voorwaardelijke weergave kunnen nog niet mee. Beide werken per frame op een synchrone `DisplayList` — `RekenbladKoppen` via `volgKopRaster`, `voorwaardelijke-weergave.ts` via `registreerRenderProjectie` — en 0.5.1 heeft geen asynchrone tegenhanger van die frameterugkoppeling: `printDisplayList` levert een momentopname zonder rastergeometrie per frame. Die twee surfaces wachten dus op een asynchrone frame- of geometriebron in de engine, niet op werk in deze app.
+
 Tot die port is de eerlijke stand: de kernelmetingen zijn begrensd en bewaakt (`Rekenbladprestaties tegen vaste drempels`), een te groot werkboek wordt geweigerd, en een herberekening die het budget niet haalde wordt gemeld — maar de berekening zelf blijft synchroon en het scrollen van 100.000 rijen is niet aantoonbaar soepel.
 
 ## Presentation

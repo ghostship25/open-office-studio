@@ -44,6 +44,42 @@ function bron(
     },
   };
 }
+/** Dezelfde proef, maar met de asynchrone editormethoden als bron. */
+function asyncBron() {
+  let versie = "1";
+  const readCells = vi.fn(
+    async (request: Parameters<WorkbookHandle["readCells"]>[0]) => ({
+      ok: true,
+      version: versie,
+      ranges: request.ranges.map(({ range }) => {
+        if (range.kind !== "rowCol") throw Error("Proef verwacht rij/kolom");
+        return {
+          cells: Array.from(
+            { length: range.end.row - range.start.row + 1 },
+            (_, r) =>
+              Array.from(
+                { length: range.end.col - range.start.col + 1 },
+                (_, c) => ({
+                  value: {
+                    kind: "number" as const,
+                    value: range.start.row + r + range.start.col + c + 1,
+                  },
+                }),
+              ),
+          ),
+        };
+      }),
+    }),
+  );
+  return {
+    lezer: { version: () => Promise.resolve(versie), readCells },
+    readCells,
+    zetVersie: (v: string) => {
+      versie = v;
+    },
+  };
+}
+
 const groot = { top: 0, left: 0, bottom: 9999, right: 9 };
 const direct = () => Promise.resolve();
 
@@ -212,6 +248,26 @@ describe("onderbreekbare selectiestatistiek", () => {
     expect(
       await teller.lees("blad", { top: 0, left: 0, bottom: 1, right: 2500 }),
     ).toEqual(selectieStatistiek(data));
+  });
+
+  it("werkt met een asynchrone bron en hergebruikt hetzelfde resultaat", async () => {
+    const b = asyncBron(),
+      teller = new SelectieStatistieken(b.lezer, direct);
+    const eerste = teller.lees("blad", groot);
+    expect(await eerste).toMatchObject({ aantal: 100000, som: 500500000 });
+    const lezingen = b.readCells.mock.calls.length;
+    expect(lezingen).toBeGreaterThanOrEqual(200);
+    expect(await teller.lees("blad", { ...groot })).toEqual(await eerste);
+    expect(b.readCells).toHaveBeenCalledTimes(lezingen);
+  });
+
+  it("geeft met een asynchrone bron geen som als de versie onderweg wijzigt", async () => {
+    const b = asyncBron();
+    let blokken = 0;
+    const teller = new SelectieStatistieken(b.lezer, async () => {
+      if (++blokken === 2) b.zetVersie("2");
+    });
+    expect(await teller.lees("a", groot)).toBeNull();
   });
 
   it("leest geen enkele cel voor een te grote selectie", async () => {

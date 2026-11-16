@@ -18,7 +18,12 @@ export function useRekenbladStatus(api: XlsxEditorApi | null, zichtbaar: boolean
     let wachten = 0;
     let gestopt = false;
     let meting = 0;
-    const statistieken = new SelectieStatistieken(api.handle);
+    // De dure leesactie loopt via de asynchrone editormethoden, niet via de
+    // synchrone handle: dat pad blijft werken als de editor naar een worker gaat.
+    const statistieken = new SelectieStatistieken({
+      version: () => api.version(),
+      readCells: (request) => api.readCells(request),
+    });
     const filter = () => {
       try {
         return filterTelling(api, api.handle.sheetInfo().activeSheet);
@@ -36,12 +41,12 @@ export function useRekenbladStatus(api: XlsxEditorApi | null, zichtbaar: boolean
           publiceerStatus(eigenaar, { soort: "rekenblad", statistiek: null, cellen, filter: filter() });
           return;
         }
-        const versie = api.handle.version();
+        const versie = await api.version();
         const resultaat = statistieken.lees(sheetId, bereik);
         if (statistieken.bezig)
           publiceerStatus(eigenaar, { soort: "rekenblad", statistiek: null, cellen, filter: filter() });
         const statistiek = await resultaat;
-        if (gestopt || nummer !== meting || versie !== api.handle.version()) return;
+        if (gestopt || nummer !== meting || versie !== (await api.version())) return;
         publiceerStatus(eigenaar, {
           soort: "rekenblad",
           cellen,

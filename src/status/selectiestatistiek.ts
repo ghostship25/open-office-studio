@@ -8,7 +8,19 @@ const BLOK_CELLEN = 500;
 const MIN_BLOK_CELLEN = 128;
 const DOEL_MS = 12;
 const pauze = () => new Promise<void>((klaar) => setTimeout(klaar, 0));
-type Lezer = Pick<WorkbookHandle, "version" | "readCells">;
+/**
+ * De leesbron van een selectie: de synchrone handle, of de asynchrone
+ * editormethoden. Beide zijn toegestaan; alles wordt geawait, zodat een
+ * worker-editie later zonder wijziging hier kan aansluiten.
+ */
+export type SelectieLezer = {
+  version: () => string | Promise<string>;
+  readCells: (
+    request: Parameters<WorkbookHandle["readCells"]>[0],
+  ) =>
+    | ReturnType<WorkbookHandle["readCells"]>
+    | Promise<ReturnType<WorkbookHandle["readCells"]>>;
+};
 
 /** Eén selectie per handle: begrensde lezingen, onderbreekbaar en herbruikbaar bij scrollen. */
 export class SelectieStatistieken {
@@ -20,7 +32,7 @@ export class SelectieStatistieken {
   } | null = null;
 
   constructor(
-    private readonly bron: Lezer,
+    private readonly bron: SelectieLezer,
     private readonly wacht = pauze,
     private readonly nu = () => performance.now(),
   ) {}
@@ -36,6 +48,17 @@ export class SelectieStatistieken {
 
   lees(sheetId: string, b: Bereik): Promise<Statistiek | null> {
     const versie = this.bron.version();
+    // Een synchrone bron geeft dezelfde belofte voor dezelfde selectie; een
+    // asynchrone bron leest de versie eerst en volgt daarna hetzelfde pad.
+    if (typeof versie === "string") return this.deel(sheetId, b, versie);
+    return Promise.resolve(versie).then((v) => this.deel(sheetId, b, v));
+  }
+
+  private deel(
+    sheetId: string,
+    b: Bereik,
+    versie: string,
+  ): Promise<Statistiek | null> {
     const sleutel = JSON.stringify([
       versie,
       sheetId,
@@ -73,8 +96,8 @@ export class SelectieStatistieken {
     const cellen = breedte * hoogte;
     if (breedte < 1 || hoogte < 1 || cellen < 2 || cellen > MAX_STATUS_CELLEN)
       return null;
-    const geldig = () =>
-      nummer === this.volgnummer && versie === this.bron.version();
+    const geldig = async () =>
+      nummer === this.volgnummer && versie === (await this.bron.version());
     const teller = new StatistiekTeller();
     // Rijvolgorde blijft gelijk, ook bij zeer brede selecties (afronding van de som).
     let budget = MIN_BLOK_CELLEN;
@@ -85,11 +108,11 @@ export class SelectieStatistieken {
       const rijen =
         kolommen === breedte ? Math.max(1, Math.floor(budget / breedte)) : 1;
       await this.wacht();
-      if (!geldig()) return null;
+      if (!(await geldig())) return null;
       const begin = this.nu();
       const eindRij = Math.min(row + rijen - 1, b.bottom);
       const eindKolom = col + kolommen - 1;
-      const lezing = this.bron.readCells({
+      const lezing = await this.bron.readCells({
         ranges: [
           {
             sheetId,
@@ -104,7 +127,7 @@ export class SelectieStatistieken {
           },
         ],
       });
-      if (!lezing.ok || !geldig()) return null;
+      if (!lezing.ok || !(await geldig())) return null;
       for (const rij of lezing.ranges[0].cells)
         for (const cel of rij) teller.tel(cel.value);
       // De eerste kleine lezing meet de machine. Onder CPU-druk kleiner,
@@ -123,6 +146,6 @@ export class SelectieStatistieken {
         row = eindRij + 1;
       }
     }
-    return geldig() ? teller.resultaat() : null;
+    return (await geldig()) ? teller.resultaat() : null;
   }
 }
