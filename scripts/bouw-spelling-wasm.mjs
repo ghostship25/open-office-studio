@@ -106,8 +106,15 @@ export async function bouwSpellingWasm({ log = console.log } = {}) {
         { env: { ...process.env, CARGO_TARGET_DIR: doelmap }, maxBuffer: 32 * 1024 * 1024 },
       );
     } catch (e) {
+      // Alleen de laatste regels met inhoud: cargo eindigt vaak met lege regels.
+      const reden = String(e?.stderr ?? e?.message ?? e)
+        .split("\n")
+        .map((regel) => regel.trim())
+        .filter(Boolean)
+        .slice(-3)
+        .join(" ");
       throw new Error(
-        `De spellingmodule kon niet worden gebouwd (cargo met doel ${DOELTRIPEL} nodig: "rustup target add ${DOELTRIPEL}"). ${String(e?.stderr ?? e?.message ?? e).trim().split("\n").slice(-3).join(" ")}`,
+        `De spellingmodule kon niet worden gebouwd (cargo met doel ${DOELTRIPEL} nodig: "rustup target add ${DOELTRIPEL}"). ${reden}`,
       );
     }
     await rm(map, { recursive: true, force: true });
