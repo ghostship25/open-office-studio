@@ -58,6 +58,20 @@ node scripts/meet-rekenbladkern.mjs
 node scripts/controleer-prestatiedrempels.mjs
 ```
 
+### Waarom de rest van #74 hier niet kan
+
+Twee eisen uit #74 blijven open: 100.000 rijen soepel scrollen en 50.000 formules op de achtergrond herberekenen met voortgang. Beide zitten achter dezelfde grens.
+
+`src/editors.tsx` geeft `XlsxEditor` de vlag `legacySyncApi`. Die kiest de verouderde engine in de hoofdthread: openen, herberekenen en opslaan zijn synchrone aanroepen op `api.handle`. Zolang die vlag er staat, kan de interface tijdens een herberekening geen voortgang tekenen — de thread die zou tekenen is de thread die rekent — en kan een groot werkblad het scrollen niet ontlasten.
+
+`@betteroffice/xlsx-react` 0.5.1 heeft daarvoor de asynchrone editor: standaard opent die de werkmap via `openWorkbookSession` in een worker, met voortgangsberichten over het sessieprotocol. `XlsxAsyncEditorApi` levert echter geen synchrone `handle`; de app gebruikt die op ongeveer 366 plaatsen in circa 60 bestanden (lint, voorwaardelijke opmaak, validatie, tekenobjecten, koppen, afdrukken, statusbalk). Overschakelen is daarom een gefaseerde port, geen vlag omzetten:
+
+1. De leeslaag (koppen, statusbalk, selectiestatistieken, voorwaardelijke weergave) naar de asynchrone `readCells`/`displayList`-aanroepen.
+2. De schrijflaag (lint, validatie, tekenobjecten, bladbeheer) naar `applyEdits` met versiecontrole.
+3. Pas daarna `legacySyncApi` laten vallen en de worker-open plus voortgang UI aanzetten.
+
+Tot die port is de eerlijke stand: de kernelmetingen zijn begrensd en bewaakt (`Rekenbladprestaties tegen vaste drempels`), een te groot werkboek wordt geweigerd, en een herberekening die het budget niet haalde wordt gemeld — maar de berekening zelf blijft synchroon en het scrollen van 100.000 rijen is niet aantoonbaar soepel.
+
 ## Presentation
 
 `DiaTelling` bewaart alleen het aantal dia’s voor de huidige documentversie. Navigatie en DOM-mutaties kunnen dat aantal hergebruiken. Invoegen, verwijderen, Undo/Redo en andere documentwijzigingen laten de teller opnieuw lezen. De statusbalk publiceert gelijke dia-/totaalaantallen niet opnieuw.
