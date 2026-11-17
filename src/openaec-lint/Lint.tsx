@@ -104,6 +104,17 @@ interface Meting {
   groepen: HTMLElement[];
   maten: GroepMaten[];
   vast: number;
+  /** Beschikbare hoogte voor de inhoud van een groep, zonder de groepsnaam. */
+  maxHoogte: number;
+}
+
+/** Natuurlijke hoogte van de groepsinhoud: een stapel twee grote knoppen telt vol mee. */
+function inhoudHoogte(inhoud: Element | null) {
+  if (!inhoud || !inhoud.getClientRects().length) return 0;
+  return [...inhoud.children].reduce(
+    (hoogste, kind) => Math.max(hoogste, kind.getBoundingClientRect().height),
+    0,
+  );
 }
 
 /** Meet elke groep op elk niveau; de DOM staat daarna weer zoals hij was. */
@@ -112,14 +123,22 @@ function meet(baan: HTMLElement): Meting {
   const groepen = kinderen.filter((kind) => kind.classList.contains("ribbon-groep"));
   const oud = groepen.map((groep) => groep.dataset.niveau);
   const breedtes = groepen.map(() => [0, 0, 0] as [number, number, number]);
+  const hoogtes = groepen.map(() => [0, 0, 0] as [number, number, number]);
+  let maxHoogte = 0;
   for (const niveau of [0, 1, 2] as const) {
     for (const groep of groepen) groep.dataset.niveau = String(niveau);
     groepen.forEach((groep, i) => {
       breedtes[i][niveau] = buitenbreedte(groep);
+      const inhoud = groep.querySelector(":scope > .ribbon-groep-inhoud");
+      hoogtes[i][niveau] = inhoudHoogte(inhoud);
+      // Alleen bij niveau 0 en 1 is de inhoud zichtbaar; daar staat de ruimte.
+      if (niveau < 2 && inhoud instanceof HTMLElement && inhoud.clientHeight)
+        maxHoogte = Math.max(maxHoogte, inhoud.clientHeight);
     });
   }
   const maten: GroepMaten[] = groepen.map((groep, i) => ({
     breedte: breedtes[i],
+    hoogte: hoogtes[i],
     prioriteit: Number(groep.dataset.prioriteit) || 0,
   }));
   groepen.forEach((groep, i) => {
@@ -133,7 +152,7 @@ function meet(baan: HTMLElement): Meting {
     kinderen
       .filter((kind) => !groepen.includes(kind))
       .reduce((som, kind) => som + buitenbreedte(kind), 0);
-  return { groepen, maten, vast };
+  return { groepen, maten, vast, maxHoogte };
 }
 
 type Toetstips =
@@ -203,9 +222,10 @@ export function Lint({
       }
       meting.current = meet(b);
     }
-    const { groepen, maten, vast } = meting.current;
+    const { groepen, maten, vast, maxHoogte } = meting.current;
     const { niveaus } = kiesNiveaus(maten, b.clientWidth - 1, {
       vast,
+      maxHoogte,
       minimum: (compact ? 1 : 0) as Niveau,
     });
     groepen.forEach((groep, i) => {

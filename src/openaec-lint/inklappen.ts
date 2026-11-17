@@ -11,6 +11,11 @@ export type Niveau = 0 | 1 | 2;
 export interface GroepMaten {
   /** Breedte in pixels per niveau (inclusief marges). */
   breedte: readonly [number, number, number];
+  /**
+   * Natuurlijke hoogte van de inhoud in pixels per niveau. Ontbreekt hij, dan
+   * telt de hoogte niet mee (bijvoorbeeld in testen zonder opmaak).
+   */
+  hoogte?: readonly [number, number, number];
   /** Hoger = blijft langer volledig. Standaard 0. */
   prioriteit?: number;
 }
@@ -35,13 +40,32 @@ export function inklapvolgorde(groepen: readonly GroepMaten[]): number[] {
  * Kiest per groep het niveau zodat alles binnen `beschikbaar` past.
  * Eerst worden alle groepen compact (rechts eerst), pas daarna klappen ze
  * één voor één in. `minimum` dwingt een niveau af (instelling ‘compact lint’).
+ * Een groep waarvan de inhoud ook compact hoger is dan `maxHoogte` klapt
+ * meteen in: breedte alleen verraadt niets over twee gestapelde knoppen.
  */
 export function kiesNiveaus(
   groepen: readonly GroepMaten[],
   beschikbaar: number,
-  { vast = 0, minimum = 0 }: { vast?: number; minimum?: Niveau } = {},
+  { vast = 0, minimum = 0, maxHoogte = Infinity }: {
+    vast?: number;
+    minimum?: Niveau;
+    maxHoogte?: number;
+  } = {},
 ): Indeling {
   const niveaus = groepen.map(() => minimum) as Niveau[];
+  // Zonder bruikbare meting (0 = nog niet gemeten) telt de hoogte niet mee.
+  if (Number.isFinite(maxHoogte) && maxHoogte > 0) {
+    groepen.forEach((groep, i) => {
+      for (const niveau of [minimum, 1] as const) {
+        if (niveau < minimum) continue;
+        if ((groep.hoogte?.[niveau] ?? 0) <= maxHoogte) {
+          niveaus[i] = niveau;
+          return;
+        }
+      }
+      niveaus[i] = 2;
+    });
+  }
   const totaal = () =>
     vast +
     groepen.reduce((som, groep, i) => som + groep.breedte[niveaus[i]], 0);

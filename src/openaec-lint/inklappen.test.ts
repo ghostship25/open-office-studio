@@ -48,6 +48,30 @@ describe("inklappen", () => {
     expect(kiesNiveaus(groepen, 600, { vast: 50 }).niveaus).toEqual([0, 1, 0]);
   });
 
+  it("klapt een groep in die ook compact te hoog blijft", () => {
+    // Twee gestapelde grote knoppen (130 px) passen nooit in 69 px, ook niet als
+    // er breedte genoeg is; de breedte vertelt daar niets over.
+    const gestapeld = { breedte: [200, 150, 60], hoogte: [130, 130, 60] } as GroepMaten;
+    const uitkomst = kiesNiveaus([gestapeld], 2000, { maxHoogte: 69 });
+    expect(uitkomst.niveaus).toEqual([2]);
+    expect(uitkomst.overloop).toBe(false);
+  });
+
+  it("houdt een groep die pas compact in de hoogte past op niveau 1", () => {
+    const bijna = { breedte: [200, 150, 60], hoogte: [100, 50, 50] } as GroepMaten;
+    expect(kiesNiveaus([bijna], 2000, { maxHoogte: 69 }).niveaus).toEqual([1]);
+  });
+
+  it("laat groepen zonder hoogtemeting ongemoeid", () => {
+    expect(kiesNiveaus([groep(100, 100, 60)], 2000, { maxHoogte: 69 }).niveaus).toEqual([0]);
+    expect(kiesNiveaus([groep(100, 100, 60)], 2000, { maxHoogte: 0 }).niveaus).toEqual([0]);
+  });
+
+  it("klapt in de compacte stand net zo goed in als de inhoud te hoog blijft", () => {
+    const gestapeld = { breedte: [200, 150, 60], hoogte: [130, 130, 60] } as GroepMaten;
+    expect(kiesNiveaus([gestapeld], 2000, { maxHoogte: 69, minimum: 1 }).niveaus).toEqual([2]);
+  });
+
   it("toont scrollknoppen alleen bij echte overloop", () => {
     expect(scrollKnoppen(0, 500, 500.5)).toEqual({ links: false, rechts: false });
     expect(scrollKnoppen(0, 500, 800)).toEqual({ links: false, rechts: true });
