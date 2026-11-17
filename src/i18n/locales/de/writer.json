@@ -1463,6 +1463,16 @@
       "allStyles": "Alle Formatvorlagen…"
     },
     "manage": {
+      "group": "Style management",
+      "pane": "Styles pane",
+      "newStyle": "New style…",
+      "newStyleHint": "Create a style from the selected paragraph",
+      "updateStyle": "Update style",
+      "updateHint": "Update the style to match the current formatting",
+      "modifyNamed": "Modify {{name}}…",
+      "modifyStyle": "Modify style…",
+      "styleSet": "Style set…",
+      "styleSetHint": "Change the style set and theme fonts",
       "import": "Import styles…",
       "importTitle": "Import document styles",
       "delete": "Delete style…",

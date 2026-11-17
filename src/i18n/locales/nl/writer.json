@@ -1463,6 +1463,16 @@
       "allStyles": "Alle stijlen…"
     },
     "manage": {
+      "group": "Stijlenbeheer",
+      "pane": "Stijlenvenster",
+      "newStyle": "Nieuwe stijl…",
+      "newStyleHint": "Maak een stijl van de geselecteerde alinea",
+      "updateStyle": "Stijl bijwerken",
+      "updateHint": "Werk de stijl bij naar de huidige opmaak",
+      "modifyNamed": "{{name}} wijzigen…",
+      "modifyStyle": "Stijl wijzigen…",
+      "styleSet": "Stijlset…",
+      "styleSetHint": "Wijzig de stijlset en themalettertypen",
       "import": "Stijlen importeren…",
       "importTitle": "Documentstijlen importeren",
       "delete": "Stijl verwijderen…",
