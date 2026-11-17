@@ -272,6 +272,12 @@
 .office .ribbon-stapel {
   gap: 1px;
 }
+/* Drie kleine knoppen onder elkaar blijven zo binnen de lintband (3 × ~20 + 2 × 1),
+   zodat de groep zichtbaar blijft in plaats van in te klappen. */
+.office .ribbon-stapel > .ribbon-actie:not(.ribbon-groot) {
+  min-height: 21px;
+  padding-block: 1px;
+}
 .office .ribbon-iconen {
   gap: 0;
 }
