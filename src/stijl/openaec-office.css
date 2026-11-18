@@ -272,9 +272,11 @@
 .office .ribbon-stapel {
   gap: 1px;
 }
-/* Drie kleine knoppen onder elkaar blijven zo binnen de lintband (3 × ~20 + 2 × 1),
-   zodat de groep zichtbaar blijft in plaats van in te klappen. */
-.office .ribbon-stapel > .ribbon-actie:not(.ribbon-groot) {
+/* Drie kleine knoppen onder elkaar blijven zo binnen de lintband (3 × 21 + 2 × 1),
+   zodat de groep zichtbaar blijft in plaats van in te klappen. Een knop met
+   uitklapmenu zit in een .tw-keuzemenu en telt evengoed als rij; zonder deze
+   afstammeling-selector houdt die de algemene 26px en valt de groep alsnog in. */
+.office .ribbon-stapel .ribbon-actie:not(.ribbon-groot) {
   min-height: 21px;
   padding-block: 1px;
 }
