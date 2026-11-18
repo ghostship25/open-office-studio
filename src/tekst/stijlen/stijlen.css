@@ -10,9 +10,12 @@
   grid-auto-flow: column;
   grid-template-rows: repeat(2, 30px);
   gap: 3px;
-  max-width: 470px;
+  /* Twaalf tegels in twee rijen vragen 6 × 86px + 5 × 3px = 531px. Bij 470px
+     moest de galerij schuiven, en die scrollbalk kostte 11px van de 69px
+     lintband, waardoor de groep Stijlen inklapte. 540px laat alle tegels
+     passen: geen scrollbalk, galerij 2 × 30 + 3px. */
+  max-width: 540px;
   overflow-x: auto;
-  scrollbar-width: thin;
 }
 .office .tekst-galerij-item {
   display: flex;
