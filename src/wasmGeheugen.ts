@@ -23,7 +23,12 @@ export function bewaarWasmInGeheugen() {
   if (geinstalleerd || "__TAURI_INTERNALS__" in window) return;
   geinstalleerd = true;
   const origineel = window.fetch.bind(window);
-  const geheugen = new Map<string, Promise<ArrayBuffer>>();
+  // Een Blob, geen ArrayBuffer: de Response leest hem zonder kopie op de
+  // hoofdthread. Met een ArrayBuffer kostte elk gebruik een extra kopie van
+  // het hele bestand (tot 24 MB per WASM), en stond al die bytes ook nog in
+  // de JS-heap. Bij openen op een krappe renderer liep dat op tot honderden
+  // milliseconden lange taken en veel geheugendruk.
+  const geheugen = new Map<string, Promise<Blob>>();
   let totaal = 0;
   window.fetch = async (invoer, init) => {
     const url =
@@ -42,17 +47,17 @@ export function bewaarWasmInGeheugen() {
     if (!bytes) {
       const antwoord = await origineel(invoer, init);
       if (!antwoord.ok) return antwoord;
-      bytes = antwoord.arrayBuffer();
+      bytes = antwoord.blob();
       geheugen.set(sleutel, bytes);
       bytes
         .then((b) => {
-          totaal += b.byteLength;
+          totaal += b.size;
           // Grens aan het geheugengebruik: daarboven niet langer bewaren.
           if (totaal > MAX_BYTES) geheugen.delete(sleutel);
         })
         .catch(() => geheugen.delete(sleutel));
     }
-    return new Response((await bytes).slice(0), {
+    return new Response(await bytes, {
       status: 200,
       headers: { "Content-Type": "application/wasm" },
     });
